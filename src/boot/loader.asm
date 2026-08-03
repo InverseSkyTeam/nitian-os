@@ -79,7 +79,7 @@ vbe_done:
         out     0xA1, al
 
         cli
-─
+
         call    waitkbdout
         mov     al, 0xD1
         out     0x64, al
@@ -89,6 +89,7 @@ vbe_done:
         call    waitkbdout
 
         lgdt    [GDTR0]
+        lidt    [IDTR0]
         mov     eax, cr0
         and     eax, 0x7FFFFFFF      
         or      eax, 0x00000001      
@@ -145,6 +146,23 @@ memcpy:
         ret
 
         alignb  16
+
+IDT0:
+    %rep 256
+        dw  default_handler 
+        dw  2*8                       
+        db  0                      
+        db  0x8E                   
+        dw  0
+    %endrep
+
+IDTR0:
+    dw  256*8 - 1     
+    dd  IDT0         
+
+default_handler:
+    iret
+
 GDT0:
     db 0, 0, 0, 0, 0, 0, 0, 0     
     dw 0xFFFF, 0x0000, 0x9200, 0x00CF 

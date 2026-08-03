@@ -23,15 +23,25 @@ $(BUILD_DIR)/loader.bin: $(SRC_DIR)/boot/loader.asm | $(BUILD_DIR)
 $(BUILD_DIR)/func.o: $(SRC_DIR)/kernel/asmCall/func.asm | $(BUILD_DIR)
 	$(ASM) -f elf32 $< -o $@
 
+$(BUILD_DIR)/io.o: $(SRC_DIR)/kernel/asmCall/io.asm | $(BUILD_DIR)
+	$(ASM) -f elf32 $< -o $@
+
+$(BUILD_DIR)/pic.o: $(SRC_DIR)/kernel/initer/pic/pic.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/kernel.o: $(SRC_DIR)/kernel/main.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/kernel.o \
                          $(BUILD_DIR)/func.o \
+                         $(BUILD_DIR)/io.o \
+                         $(BUILD_DIR)/pic.o \
                          $(LINKER_DIR)/kernel.ld | $(BUILD_DIR)
 	$(LD) -T $(LINKER_DIR)/kernel.ld -o $@ \
 	      $(BUILD_DIR)/kernel.o \
 	      $(BUILD_DIR)/func.o \
+	      $(BUILD_DIR)/io.o \
+	      $(BUILD_DIR)/pic.o
 
 $(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel.elf
 	$(OBJCOPY) -O binary $< $@
