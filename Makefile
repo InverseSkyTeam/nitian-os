@@ -1,0 +1,61 @@
+BUILD_DIR   = build
+SRC_DIR     = src
+LINKER_DIR  = linker
+SCRIPTS_DIR = scripts
+
+ASM     = nasm
+CC      = zig cc
+LD      = ld.lld        
+OBJCOPY = objcopy
+PYTHON  = python3       
+
+CFLAGS = -target x86-freestanding -ffreestanding -fno-builtin
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(BUILD_DIR)/boot.bin: $(SRC_DIR)/boot/boot.asm | $(BUILD_DIR)
+	$(ASM) -f bin $< -o $@
+
+$(BUILD_DIR)/loader.bin: $(SRC_DIR)/boot/loader.asm | $(BUILD_DIR)
+	$(ASM) -f bin $< -o $@
+
+$(BUILD_DIR)/func.o: $(SRC_DIR)/kernel/asmCall/func.asm | $(BUILD_DIR)
+	$(ASM) -f elf32 $< -o $@
+
+$(BUILD_DIR)/kernel.o: $(SRC_DIR)/kernel/main.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/kernel.o \
+                         $(BUILD_DIR)/func.o \
+                         $(LINKER_DIR)/kernel.ld | $(BUILD_DIR)
+	$(LD) -T $(LINKER_DIR)/kernel.ld -o $@ \
+	      $(BUILD_DIR)/kernel.o \
+	      $(BUILD_DIR)/func.o \
+
+$(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel.elf
+	$(OBJCOPY) -O binary $< $@
+
+FLOPPY_DEPS = $(BUILD_DIR)/boot.bin \
+              $(BUILD_DIR)/loader.bin \
+              $(BUILD_DIR)/kernel.bin \
+              $(SCRIPTS_DIR)/mkfloppy.py
+
+$(BUILD_DIR)/floppy.img: $(FLOPPY_DEPS) | $(BUILD_DIR)
+	$(PYTHON) $(SCRIPTS_DIR)/mkfloppy.py \
+	          $(BUILD_DIR)/boot.bin \
+	          $(BUILD_DIR)/loader.bin \
+	          $(BUILD_DIR)/kernel.bin \
+	          $@
+
+.PHONY: all floppy run clean
+
+all: floppy
+
+floppy: $(BUILD_DIR)/floppy.img
+
+run: floppy
+	qemu-system-i386 -m 4G -fda $(BUILD_DIR)/floppy.img -debugcon stdio
+
+clean:
+	rm -rf $(BUILD_DIR)
