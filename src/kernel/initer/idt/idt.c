@@ -73,7 +73,7 @@ void initIDT(void) {
     setIDT(46, irq14, IDT_TYPE_INT_GATE32);
     setIDT(47, irq15, IDT_TYPE_INT_GATE32);
 
-    setIDT(0x80, default_handler, IDT_TYPE_TRAP_GATE3);
+    setIDT(0x80, syscall_0x80, IDT_TYPE_TRAP_GATE3);
 
     idtr0.limit = (uint16_t)(sizeof(idt) - 1);
     idtr0.base  = (uint32_t)idt;

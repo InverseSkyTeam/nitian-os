@@ -52,6 +52,8 @@ extern void irq15(void);
 
 extern void default_handler(void);
 
+extern void syscall_0x80(void);
+
 struct Registers {
     uint32_t gs, fs, es, ds;
     uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;

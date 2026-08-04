@@ -5,10 +5,10 @@
 
 void assert_fail(const char* expr, const char* file, int line) {
     setTextColor(12);
-    printf("\n*** ASSERT FAILED ***\n");
-    printf("  expr: %s\n", expr);
-    printf("  file: %s\n", file);
-    printf("  line: %d\n", line);
+    kprintf("\n*** ASSERT FAILED ***\n");
+    kprintf("  expr: %s\n", expr);
+    kprintf("  file: %s\n", file);
+    kprintf("  line: %d\n", line);
 
     asm_cli();
     for (;;) {

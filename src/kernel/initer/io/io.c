@@ -111,7 +111,7 @@ static void printSigned(int v, int width, int pad0) {
     while (n--) putc(buf[n]);
 }
 
-void printf(const char* fmt, ...) {
+void kprintf(const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
 
@@ -155,8 +155,17 @@ void printf(const char* fmt, ...) {
     va_end(ap);
 }
 
-void showChar(uint8_t* vram, int pitch, int x, int y, int scrnx, int scrny, char c, int color, int bg) {
-    const uint8_t* font = FONT_BASE + ((uint8_t)c) * 16;
+void console_putc(char c) {
+    putc(c);
+}
+
+void console_put_str(const char* s) {
+    while (*s) {
+        putc(*s++);
+    }
+}
+
+void showChar(uint8_t* vram, int pitch, int x, int y, int scrnx, int scrny, char c, int color, int bg) {    const uint8_t* font = FONT_BASE + ((uint8_t)c) * 16;
 
     for (int row = 0; row < 16; row++) {
         uint8_t bits = font[row];

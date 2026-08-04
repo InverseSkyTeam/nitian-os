@@ -14,10 +14,12 @@ CFLAGS = -target x86-freestanding -ffreestanding -fno-builtin -fno-sanitize=all
 KERNEL_HDRS := $(wildcard $(SRC_DIR)/kernel/include/*.h \
                          $(SRC_DIR)/kernel/include/asm/*.h \
                          $(SRC_DIR)/kernel/lib/*/*.h \
+                         $(SRC_DIR)/kernel/lib/user/*.h \
                          $(SRC_DIR)/kernel/memory/*/*.h \
                          $(SRC_DIR)/kernel/thread/*.h \
                          $(SRC_DIR)/kernel/device/*.h \
                          $(SRC_DIR)/kernel/userprog/*.h \
+                         $(SRC_DIR)/kernel/syscall/*.h \
                          $(SRC_DIR)/kernel/initer/*/*.h)
 
 $(BUILD_DIR):
@@ -98,6 +100,15 @@ $(BUILD_DIR)/tss.o: $(SRC_DIR)/kernel/initer/tss/tss.c $(KERNEL_HDRS) | $(BUILD_
 $(BUILD_DIR)/process.o: $(SRC_DIR)/kernel/userprog/process.c $(KERNEL_HDRS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/ksyscall.o: $(SRC_DIR)/kernel/syscall/syscall.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/usyscall.o: $(SRC_DIR)/kernel/lib/user/syscall.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/ustdio.o: $(SRC_DIR)/kernel/lib/user/stdio.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
                          $(BUILD_DIR)/kernel.o \
                          $(BUILD_DIR)/func.o \
@@ -121,6 +132,9 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 						 $(BUILD_DIR)/gdt.o \
 						 $(BUILD_DIR)/tss.o \
 						 $(BUILD_DIR)/process.o \
+						 $(BUILD_DIR)/ksyscall.o \
+						 $(BUILD_DIR)/usyscall.o \
+						 $(BUILD_DIR)/ustdio.o \
                          $(LINKER_DIR)/kernel.ld | $(BUILD_DIR)
 	$(LD) -T $(LINKER_DIR)/kernel.ld -o $@ \
 	      $(BUILD_DIR)/entry.o \
@@ -145,7 +159,10 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 		  $(BUILD_DIR)/keyboard.o \
 		  $(BUILD_DIR)/gdt.o \
 		  $(BUILD_DIR)/tss.o \
-		  $(BUILD_DIR)/process.o
+		  $(BUILD_DIR)/process.o \
+		  $(BUILD_DIR)/ksyscall.o \
+		  $(BUILD_DIR)/usyscall.o \
+		  $(BUILD_DIR)/ustdio.o
 
 $(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel.elf
 	$(OBJCOPY) -O binary $< $@

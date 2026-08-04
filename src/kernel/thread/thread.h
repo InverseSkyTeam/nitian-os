@@ -34,6 +34,7 @@ struct thread_stack {
 struct task_struct {
     uint32_t* self_kstack;
     enum task_status status;
+    uint32_t pid;
     char name[16];
     uint8_t priority;
     uint8_t ticks;

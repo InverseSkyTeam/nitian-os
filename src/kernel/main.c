@@ -15,6 +15,9 @@
 #include "./device/ioqueue.h"
 #include "./device/keyboard.h"
 #include "./userprog/process.h"
+#include "./syscall/syscall.h"
+#include "./lib/user/syscall.h"
+#include "./lib/user/stdio.h"
 
 struct BootInfo {
     uint8_t  cyls;
@@ -103,13 +106,13 @@ static int test_var_b = 0;
 
 static void u_prog_a(void) {
     for (;;) {
-        test_var_a++;
+        printf("%s%d%c", " program_a_pid:", getpid(), '\n');
     }
 }
 
 static void u_prog_b(void) {
     for (;;) {
-        test_var_b++;
+        printf("%s%d%c", " program_b_pid:", getpid(), '\n');
     }
 }
 
@@ -117,7 +120,7 @@ static void k_thread_a(void* arg) {
     for (;;) {
         if (g_tick % PIT_HZ == 0) {
             setTextColor(11);
-            printf("k_a: user_var_a=%d\n", test_var_a);
+            printf("thread_a_pid:0x%x user_var_a=%d\n", getpid(), test_var_a);
         }
         thread_yield();
     }
@@ -127,7 +130,7 @@ static void k_thread_b(void* arg) {
     for (;;) {
         if (g_tick % PIT_HZ == 0) {
             setTextColor(9);
-            printf("k_b: user_var_b=%d\n", test_var_b);
+            printf("thread_b_pid:0x%x user_var_b=%d\n", getpid(), test_var_b);
         }
         thread_yield();
     }
@@ -138,6 +141,7 @@ void KMain(void) {
     initPalette();
     initIO((uint8_t*)bootInfo->vram, bootInfo->scrnx, bootInfo->scrny);
     initIDT();
+    syscall_init();
     mm_init();
     gdt_init();
     tss_init();
@@ -219,6 +223,9 @@ void KMain(void) {
 
     setTextColor(10);
     printf("[OK] user processes + demo threads started, type to see [KBD] lines\n");
+
+    setTextColor(14);
+    printf("main_pid:0x%x\n", getpid());
 
     asm_sti();
     for (;;) {

@@ -50,19 +50,19 @@ void isr_handler(struct Registers* r) {
     uint32_t n = r->int_no;
 
     setTextColor(12);
-    printf("\n*** EXCEPTION ***\n");
+    kprintf("\n*** EXCEPTION ***\n");
 
     if (n < 32) {
-        printf("  %s (vector %d)\n", g_exc_names[n], (int)n);
-        printf("  err_code = 0x%x\n", r->err_code);
+        kprintf("  %s (vector %d)\n", g_exc_names[n], (int)n);
+        kprintf("  err_code = 0x%x\n", r->err_code);
     } else {
-        printf("  Unregistered interrupt (vector %d)\n", (int)n);
+        kprintf("  Unregistered interrupt (vector %d)\n", (int)n);
     }
 
-    printf("  eip = 0x%x  cs = 0x%x  eflags = 0x%x\n", r->eip, r->cs, r->eflags);
-    printf("  eax = 0x%x  ebx = 0x%x  ecx = 0x%x  edx = 0x%x\n",
+    kprintf("  eip = 0x%x  cs = 0x%x  eflags = 0x%x\n", r->eip, r->cs, r->eflags);
+    kprintf("  eax = 0x%x  ebx = 0x%x  ecx = 0x%x  edx = 0x%x\n",
            r->eax, r->ebx, r->ecx, r->edx);
-    printf("  esi = 0x%x  edi = 0x%x  ebp = 0x%x  ds = 0x%x\n",
+    kprintf("  esi = 0x%x  edi = 0x%x  ebp = 0x%x  ds = 0x%x\n",
            r->esi, r->edi, r->ebp, r->ds);
 
     asm_cli();
@@ -83,7 +83,7 @@ void irq_handler(struct Registers* r) {
         g_tick++;
         if (g_tick % PIT_HZ == 0) {
             setTextColor(10);
-            printf("tick: %d\n", (int)g_tick);
+            kprintf("tick: %d\n", (int)g_tick);
         }
         if (current_task != 0) {
             schedule();

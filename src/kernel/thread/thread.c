@@ -9,6 +9,7 @@
 static struct list g_ready_list;
 static struct task_struct g_task_table[MAX_TASKS];
 static uint32_t g_task_count = 0;
+static uint32_t g_pid_alloc = 0;
 
 struct task_struct* current_task;
 
@@ -39,6 +40,7 @@ struct task_struct* thread_create(char* name, uint8_t priority, thread_func func
     ts->func_arg = arg;
     t->self_kstack = (uint32_t*)ts;
     t->status = TASK_READY;
+    t->pid = g_pid_alloc++;
     strcpy(t->name, name);
     t->priority = priority;
     t->ticks = priority;
@@ -55,6 +57,7 @@ void thread_init(void) {
     current_task = &g_task_table[0];
     g_task_table[0].self_kstack = 0;
     g_task_table[0].status = TASK_RUNNING;
+    g_task_table[0].pid = g_pid_alloc++;
     strcpy(g_task_table[0].name, "main");
     g_task_table[0].priority = 5;
     g_task_table[0].ticks = 5;

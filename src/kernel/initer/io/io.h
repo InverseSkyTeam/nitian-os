@@ -8,7 +8,10 @@ void setCursor(int x, int y);
 int  getCursorX(void);
 int  getCursorY(void);
 
-void printf(const char* fmt, ...);
+void kprintf(const char* fmt, ...);
+
+void console_putc(char c);
+void console_put_str(const char* s);
 
 void showChar(uint8_t* vram, int pitch, int x, int y, int scrnx, int scrny, char c, int color, int bg);
 void showString(uint8_t* vram, int pitch, int x, int y, int scrnx, int scrny, const char* s, int color, int bg);

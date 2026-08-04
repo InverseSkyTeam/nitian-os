@@ -142,3 +142,35 @@ default_handler:
     push dword 0
     push dword 0xFFFF
     jmp isr_common_stub
+
+global syscall_0x80
+syscall_0x80:
+    push dword 0
+    push dword 0x80
+    jmp syscall_common_stub
+
+extern syscall_handler
+syscall_common_stub:
+    pusha
+    mov ax, ds
+    push eax
+    mov ax, es
+    push eax
+    mov ax, fs
+    push eax
+    mov ax, gs
+    push eax
+
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    push esp
+    call syscall_handler
+    add esp, 4
+
+    mov [esp + 44], eax
+
+    jmp intr_exit
