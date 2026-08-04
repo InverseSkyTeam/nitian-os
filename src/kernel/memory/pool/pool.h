@@ -20,5 +20,6 @@ extern struct pool kernel_pool;
 void mm_init(void);
 void* palloc(struct pool* pool);
 void pfree(struct pool* pool, uint32_t phy_addr);
+uint32_t palloc_pages(struct pool* pool, uint32_t cnt);
 
 #endif

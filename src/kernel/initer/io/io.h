@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#define FONT_BASE ((const uint8_t*)0x10000)
+#define FONT_BASE ((const uint8_t*)0x11000)
 
 void initIO(uint8_t* vram, int scrnx, int scrny);
 void setTextColor(int color);

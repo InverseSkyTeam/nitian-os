@@ -11,3 +11,6 @@ extern uint8_t inb(uint16_t port);
 extern uint32_t asm_read_cr0(void);
 extern void asm_write_cr0(uint32_t cr0);
 extern void asm_write_cr3(uint32_t cr3);
+
+extern uint32_t asm_save_eflags(void);
+extern void asm_restore_eflags(uint32_t eflags);

@@ -34,6 +34,8 @@ void setCursor(int x, int y) {
 int getCursorX(void) { return g_cursor_x; }
 int getCursorY(void) { return g_cursor_y; }
 
+#define DEBUG_CONSOLE_PORT 0xE9
+
 static void putc(char c) {
     if (c == '\n') {
         g_cursor_y += PRINTF_LINE_GAP;
@@ -50,6 +52,7 @@ static void putc(char c) {
             g_cursor_x = 0;
         }
     }
+    outb(DEBUG_CONSOLE_PORT, (uint8_t)c);
 }
 
 static void printUnsigned(uint32_t v, int base, int upper,

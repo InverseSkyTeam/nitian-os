@@ -68,3 +68,16 @@ void pfree(struct pool* pool, uint32_t phy_addr) {
     uint32_t idx = (phy_addr - pool->phy_addr_start) / PAGE_SIZE;
     bitmap_set(&pool->pool_bitmap, idx, 0);
 }
+
+uint32_t palloc_pages(struct pool* pool, uint32_t cnt) {
+    int idx = bitmap_scan(&pool->pool_bitmap, cnt);
+    if (idx == -1) {
+        return 0;
+    }
+    for (uint32_t i = 0; i < cnt; i++) {
+        bitmap_set(&pool->pool_bitmap, (uint32_t)idx + i, 1);
+    }
+    uint32_t addr = pool->phy_addr_start + (uint32_t)idx * PAGE_SIZE;
+    memset((void*)addr, 0, cnt * PAGE_SIZE);
+    return addr;
+}

@@ -36,3 +36,16 @@ asm_write_cr3:
         mov     eax, [esp+4]
         mov     cr3, eax
         ret
+
+global asm_save_eflags
+asm_save_eflags:
+        pushfd
+        pop     eax
+        ret
+
+global asm_restore_eflags
+asm_restore_eflags:
+        mov     eax, [esp+4]
+        push    eax
+        popfd
+        ret

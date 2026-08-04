@@ -7,6 +7,10 @@
 #include "./lib/str/str.h"
 #include "./memory/bitmap/bitmap.h"
 #include "./memory/pool/pool.h"
+#include "./thread/thread.h"
+#include "./thread/sync.h"
+#include "./device/ioqueue.h"
+#include "./device/keyboard.h"
 
 struct BootInfo {
     uint8_t  cyls;
@@ -17,6 +21,78 @@ struct BootInfo {
     uint16_t scrny;
     uint32_t vram;
 };
+
+static struct ioqueue demo_ioq;
+static volatile int g_produced = 0;
+static volatile int g_consumed = 0;
+#define DEMO_TOTAL 100
+
+static void demo_producer(void* arg) {
+    for (;;) {
+        uint32_t old = asm_save_eflags();
+        asm_cli();
+        if (g_produced >= DEMO_TOTAL) {
+            asm_restore_eflags(old);
+            break;
+        }
+        char c = (char)('A' + (g_produced % 26));
+        ioq_putchar(&demo_ioq, c);
+        g_produced++;
+        asm_restore_eflags(old);
+        if (g_produced % 25 == 0) {
+            setTextColor(13);
+            printf("[P] produced %d chars\n", (int)g_produced);
+        }
+        thread_yield();
+    }
+    setTextColor(13);
+    printf("[P] producer done (%d chars)\n", (int)g_produced);
+}
+
+static void demo_consumer(void* arg) {
+    for (;;) {
+        uint32_t old = asm_save_eflags();
+        asm_cli();
+        if (g_consumed >= DEMO_TOTAL) {
+            asm_restore_eflags(old);
+            break;
+        }
+        char c = ioq_getchar(&demo_ioq);
+        g_consumed++;
+        asm_restore_eflags(old);
+        if (g_consumed % 25 == 0) {
+            setTextColor(11);
+            printf("[C] consumed %d chars (last='%c')\n", (int)g_consumed, c);
+        }
+        thread_yield();
+    }
+    setTextColor(11);
+    printf("[C] consumer done (%d chars)\n", (int)g_consumed);
+}
+
+static void kbd_consumer(void* arg) {
+    char line[80];
+    int n = 0;
+    for (;;) {
+        uint32_t old = asm_save_eflags();
+        asm_cli();
+        char c = ioq_getchar(&keyboard_ioq);
+        asm_restore_eflags(old);
+        if (c == '\n' || c == '\r') {
+            line[n] = 0;
+            setTextColor(12);
+            printf("[KBD] line: %s\n", line);
+            n = 0;
+        } else if (c == 0x08) {
+            if (n > 0) {
+                n--;
+            }
+        } else if (n < (int)sizeof(line) - 1) {
+            line[n++] = c;
+        }
+        thread_yield();
+    }
+}
 
 void KMain(void) {
     const struct BootInfo *bootInfo = (const struct BootInfo*)0x0FF0;
@@ -82,11 +158,23 @@ void KMain(void) {
     ASSERT((uint32_t)p4 == freed);
     printf("[OK] pfree/realloc: %x\n", (uint32_t)p4);
 
+    ioq_init(&demo_ioq);
+    keyboard_init();
+
+    thread_init();
     setTextColor(10);
-    printf("[OK] Interrupts enabled, PIT timer running...\n");
+    printf("[OK] thread mgr ready, creating Ch.10 demo threads...\n");
+
+    kernel_thread("producer", 3, demo_producer, 0);
+    kernel_thread("consumer", 3, demo_consumer, 0);
+    kernel_thread("kbd",      4, kbd_consumer, 0);
+
+    setTextColor(10);
+    printf("[OK] producer/consumer + keyboard echo started, type to see [KBD] lines\n");
 
     asm_sti();
-    while(1) {
+    for (;;) {
+        thread_yield();
         asm_hlt();
     }
 }

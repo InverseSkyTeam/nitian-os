@@ -26,6 +26,10 @@
 | 位图 | `memory/bitmap`：位图分配器，高位在前（参考《操作系统真相还原》第5章） |
 | 分页 + Higher Half | `entry.asm` 物理入口建页表（恒等 256MB + 高半区内核 16MB + VRAM）→ 开分页 → 跳转 `0xC0000000+` 运行；内核虚拟地址 `0xC0280000`，物理加载 `0x280000` |
 | 内存池 | `memory/pool`：E820 探测物理内存，位图管理页框，`palloc`/`pfree`（参考《操作系统真相还原》第8章） |
+| 线程与调度 | `thread`：任务表 + 就绪队列 + 时间片调度，`kernel_thread` 创建内核线程，`switch_to` 汇编上下文切换（参考第9章） |
+| 同步机制 | `thread/sync`：信号量 `sema_down/up` 与可重入锁 `lock_acquire/release`，关中断保证原子性（参考第11章） |
+| 环形缓冲区 | `device/ioqueue`：生产者-消费者模型，满/空时阻塞等待，`ioq_putchar`/`ioq_getchar`（参考第11章） |
+| 键盘驱动 | `device/keyboard` + IRQ1 分发：8042 扫描码 → 双键位 keymap（shift/caps），字符写入键盘环形缓冲区 |
 
 ## 目录结构
 
@@ -93,7 +97,9 @@ make run
 qemu-system-i386 -m 4G -fda build/floppy.img
 ```
 
-内核启动后将在屏幕打印启动信息，并持续输出定时器 `tick` 计数。
+内核启动后将在屏幕打印启动信息，并持续输出定时器 `tick` 计数。随后创建生产者/消费者演示线程（100 字符乒乓传输）与键盘回显线程，在 QEMU 中输入按键可在屏幕看到 `[KBD] line: ...` 行回显。
+
+> `printf` 会同步镜像输出到 QEMU debugcon（端口 0xE9），因此 `make run` 的 `-debugcon stdio` 可在终端直接看到内核日志，便于无头调试。
 
 ## 参考资料与致谢
 
@@ -109,8 +115,8 @@ qemu-system-i386 -m 4G -fda build/floppy.img
 ## 路线图
 
 - [x] 内存管理：物理内存探测（E820）、位图、分页、Higher Half 映射、物理内存池
+- [x] 输入输出系统：内核线程与调度、信号量与锁、环形缓冲区（生产者-消费者）、键盘驱动（IRQ1）
 - [ ] 内核堆分配器（基于内存池）
-- [ ] 键盘驱动（IRQ1）
 - [ ] 系统调用（int 0x80）
 - [ ] 简单进程调度
 - [ ] 文件系统

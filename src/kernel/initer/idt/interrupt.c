@@ -4,6 +4,7 @@
 #include "../io/io.h"
 #include "../pic/pic.h"
 #include "../pit/pit.h"
+#include "../../device/keyboard.h"
 
 volatile uint32_t g_tick = 0;
 
@@ -78,6 +79,10 @@ void irq_handler(struct Registers* r) {
             setTextColor(10);
             printf("tick: %d\n", (int)g_tick);
         }
+    }
+
+    if (irq == 1) {
+        keyboard_handler();
     }
 
     if (irq >= 8) {

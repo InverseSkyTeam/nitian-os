@@ -1,0 +1,54 @@
+// 参考: 《操作系统真相还原》(于渊) 第9章 线程与调度
+#ifndef THREAD_H
+#define THREAD_H
+
+#include <stdint.h>
+#include "../lib/list/list.h"
+
+#define THREAD_STACK_SIZE 0x2000
+#define MAX_TASKS 64
+#define STACK_MAGIC 0x19860726
+
+enum task_status {
+    TASK_RUNNING,
+    TASK_READY,
+    TASK_BLOCKED,
+    TASK_DIED
+};
+
+typedef void (*thread_func)(void*);
+
+struct thread_stack {
+    uint32_t eflags;
+    uint32_t esi;
+    uint32_t edi;
+    uint32_t ebx;
+    uint32_t ebp;
+    void (*eip)(thread_func, void*);
+    void (*unused_retaddr);
+    thread_func function;
+    void* func_arg;
+};
+
+struct task_struct {
+    uint32_t* self_kstack;
+    enum task_status status;
+    char name[16];
+    uint8_t priority;
+    uint8_t ticks;
+    uint32_t elapsed_ticks;
+    struct list_elem general_tag;
+    uint32_t stack_magic;
+};
+
+extern struct task_struct* current_task;
+
+void thread_init(void);
+void kernel_thread(char* name, uint8_t priority, thread_func function, void* arg);
+void schedule(void);
+void switch_to(uint32_t** cur_kstack, uint32_t** next_kstack);
+void thread_block(void);
+void thread_unblock(struct task_struct* t);
+void thread_yield(void);
+
+#endif
