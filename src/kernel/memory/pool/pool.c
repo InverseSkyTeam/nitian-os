@@ -47,7 +47,7 @@ void mm_init(void) {
     kernel_pool.pool_bitmap.btmp_bytes_len = sizeof(kernel_pool_bitmap);
     bitmap_init(&kernel_pool.pool_bitmap);
     mark_used(0x280000, 0x400000 - 0x280000);
-    mark_used(0x400000, 0x450000 - 0x400000);
+    mark_used(0x400000, 0x460000 - 0x400000);
 }
 
 void* palloc(struct pool* pool) {

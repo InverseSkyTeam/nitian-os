@@ -6,7 +6,6 @@
 #include "./initer/idt/idt.h"
 #include "./lib/str/str.h"
 #include "./memory/bitmap/bitmap.h"
-#include "./memory/paging/paging.h"
 #include "./memory/pool/pool.h"
 
 struct BootInfo {
@@ -24,7 +23,6 @@ void KMain(void) {
     initPalette();
     initIO((uint8_t*)bootInfo->vram, bootInfo->scrnx, bootInfo->scrny);
     initIDT();
-    init_paging(bootInfo->vram);
     mm_init();
 
     setCursor(0, 0);
@@ -33,7 +31,7 @@ void KMain(void) {
     printf("Kernel Inited.\n");
 
     setTextColor(10);
-    printf("[OK] Paging enabled (identity 0-256MB + vram)\n");
+    printf("[OK] Higher Half Kernel @ 0xC0000000+\n");
 
     if (initPic() == 0) {
         printf("[OK] PIC inited\n");

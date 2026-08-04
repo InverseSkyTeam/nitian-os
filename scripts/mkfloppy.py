@@ -1,18 +1,3 @@
-"""
-mkfloppy.py - NiTianOS FAT12 1.44MB floppy image builder
-
-Uses boot.bin as-is (already has FAT12 BPB).
-Formats FAT12 structures (FAT tables, root directory).
-Places loader, kernel, and optional test files.
-
-Disk layout:
-  Sector 0:       boot.bin (512 bytes, with BPB)
-  Sector 1-9:     FAT1 (9 sectors)
-  Sector 10-18:   FAT2 (copy)
-  Sector 19-32:   Root directory (14 sectors, 224 entries)
-  Sector 33+:     Data area (cluster 2 starts here)
-"""
-
 import sys
 import struct
 
@@ -53,8 +38,8 @@ def make_dir_entry(name, ext, attr, first_cluster, file_size):
     entry[11] = attr
     struct.pack_into('<H', entry, 0x1A, first_cluster)
     struct.pack_into('<I', entry, 0x1C, file_size)
-    struct.pack_into('<H', entry, 0x18, 0x5821)  # date: 2024-01-01
-    struct.pack_into('<H', entry, 0x16, 0x0000)  # time
+    struct.pack_into('<H', entry, 0x18, 0x5821)
+    struct.pack_into('<H', entry, 0x16, 0x0000)
     return entry
 
 
@@ -95,7 +80,6 @@ def create_floppy(boot_path, loader_path, kernel_path, output_path, extra_files=
 
     img[0:SECTOR_SIZE] = boot
 
-    # ── FAT tables ──
     fat = make_fat12()
 
     loader_size = len(loader)

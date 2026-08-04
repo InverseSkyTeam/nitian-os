@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 #include "../bitmap/bitmap.h"
-#include "../paging/paging.h"
 
+#define PAGE_SIZE 0x1000
 #define MEMORY_BASE 0x100000
 #define MAX_PHYS_MEM 0x20000000
 

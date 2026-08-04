@@ -29,6 +29,9 @@ $(BUILD_DIR)/io.o: $(SRC_DIR)/kernel/asmCall/io.asm | $(BUILD_DIR)
 $(BUILD_DIR)/stub.o: $(SRC_DIR)/kernel/asmCall/stub.asm | $(BUILD_DIR)	
 	$(ASM) -f elf32 $< -o $@
 
+$(BUILD_DIR)/entry.o: $(SRC_DIR)/kernel/asmCall/entry.asm | $(BUILD_DIR)
+	$(ASM) -f elf32 $< -o $@
+
 $(BUILD_DIR)/ioc.o: $(SRC_DIR)/kernel/initer/io/io.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -56,13 +59,11 @@ $(BUILD_DIR)/str.o: $(SRC_DIR)/kernel/lib/str/str.c | $(BUILD_DIR)
 $(BUILD_DIR)/bitmap.o: $(SRC_DIR)/kernel/memory/bitmap/bitmap.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/paging.o: $(SRC_DIR)/kernel/memory/paging/paging.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
 $(BUILD_DIR)/pool.o: $(SRC_DIR)/kernel/memory/pool/pool.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/kernel.o \
+$(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
+                         $(BUILD_DIR)/kernel.o \
                          $(BUILD_DIR)/func.o \
                          $(BUILD_DIR)/ioc.o \
 						 $(BUILD_DIR)/io.o \
@@ -74,10 +75,10 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/kernel.o \
 						 $(BUILD_DIR)/assert.o \
 						 $(BUILD_DIR)/str.o \
 						 $(BUILD_DIR)/bitmap.o \
-						 $(BUILD_DIR)/paging.o \
 						 $(BUILD_DIR)/pool.o \
                          $(LINKER_DIR)/kernel.ld | $(BUILD_DIR)
 	$(LD) -T $(LINKER_DIR)/kernel.ld -o $@ \
+	      $(BUILD_DIR)/entry.o \
 	      $(BUILD_DIR)/kernel.o \
 	      $(BUILD_DIR)/func.o \
 	      $(BUILD_DIR)/ioc.o \
@@ -90,7 +91,6 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/kernel.o \
 		  $(BUILD_DIR)/assert.o \
 		  $(BUILD_DIR)/str.o \
 		  $(BUILD_DIR)/bitmap.o \
-		  $(BUILD_DIR)/paging.o \
 		  $(BUILD_DIR)/pool.o
 
 $(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel.elf

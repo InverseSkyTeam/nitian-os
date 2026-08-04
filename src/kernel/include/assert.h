@@ -1,3 +1,7 @@
+// 参考: https://wiki.osdev.org/Assertions
+#ifndef ASSERT_H
+#define ASSERT_H
+
 #ifdef NDEBUG
 #define ASSERT(expr) ((void)0)
 #else
@@ -5,3 +9,5 @@
 #endif
 
 void assert_fail(const char* expr, const char* file, int line) __attribute__((noreturn));
+
+#endif

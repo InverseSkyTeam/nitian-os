@@ -6,7 +6,7 @@
 
 ` NiTianOS` 是一个用于学习操作系统原理的教学型内核。它从 16 位实模式下的引导扇区起步，经加载器进入 32 位保护模式，并最终运行一个最小化的 C 内核。项目聚焦于理解底层机制：分段、中断、中断控制器与定时器。
 
-当前内核已能在 QEMU 中引导并稳定产生定时器中断（屏幕持续打印 `tick` 计数），证明 `IDT → PIC → PIT → IRQ` 的完整中断链路工作正常。
+当前内核已能在 QEMU 中引导、开启分页并稳定产生定时器中断（屏幕持续打印 `tick` 计数），证明 `IDT → PIC → PIT → IRQ` 的完整中断链路工作正常。内核运行于 **Higher Half**（虚拟地址 `0xC0000000+`），低端 3GB 地址空间留给未来的用户进程。
 
 ## 已实现功能
 
@@ -22,6 +22,10 @@
 | 定时器 (PIT) | `pit.c` 配置 8253/8254 通道 0 为 100 Hz 速率发生器，驱动 IRQ0 |
 | 屏幕输出 | `io.c` 文本模式输出与 `printf`，支持 `%d %u %x %X %c %s` |
 | 断言 (ASSERT) | `assert.h / assert.c`：失败时打印表达式、文件名、行号并停机（参考 OSDev Assertions） |
+| 字符串库 | `lib/str`：strlen/strcpy/strcmp/strcat/strchr + memcpy/memset/memmove/memcmp（参考 OSDev C Library） |
+| 位图 | `memory/bitmap`：位图分配器，高位在前（参考《操作系统真相还原》第5章） |
+| 分页 + Higher Half | `entry.asm` 物理入口建页表（恒等 256MB + 高半区内核 16MB + VRAM）→ 开分页 → 跳转 `0xC0000000+` 运行；内核虚拟地址 `0xC0280000`，物理加载 `0x280000` |
+| 内存池 | `memory/pool`：E820 探测物理内存，位图管理页框，`palloc`/`pfree`（参考《操作系统真相还原》第8章） |
 
 ## 目录结构
 
@@ -45,9 +49,16 @@ NiTianOS/
 │       │   ├── asmFunc.h   # C 调用汇编函数声明
 │       │   └── asm/stub.h  # 中断栈帧结构
 │       ├── asmCall/
-│       │   ├── func.asm    # 底层辅助
+│       │   ├── entry.asm   # 内核物理入口：建页表、开分页、跳转高半区
+│       │   ├── func.asm    # 底层辅助（含 CR0/CR3 操作）
 │       │   ├── io.asm      # 端口 I/O
 │       │   └── stub.asm    # 中断入口桩
+│       ├── lib/
+│       │   ├── str/        # 字符串库
+│       │   └── assets/     # 资源文件目录
+│       ├── memory/
+│       │   ├── bitmap/     # 位图分配器
+│       │   └── pool/       # 物理内存池（palloc/pfree）
 │       └── initer/
 │           ├── io/         # 屏幕与 printf
 │           ├── pic/        # 8259A PIC
@@ -97,7 +108,8 @@ qemu-system-i386 -m 4G -fda build/floppy.img
 
 ## 路线图
 
-- [ ] 内存管理：物理内存探测与位图管理、分页机制、内核堆分配（参考《操作系统真相还原》）
+- [x] 内存管理：物理内存探测（E820）、位图、分页、Higher Half 映射、物理内存池
+- [ ] 内核堆分配器（基于内存池）
 - [ ] 键盘驱动（IRQ1）
 - [ ] 系统调用（int 0x80）
 - [ ] 简单进程调度
