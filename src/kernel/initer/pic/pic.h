@@ -9,4 +9,4 @@
 
 #define ICW4_8086      0x01
 
-void InitPic(void);
+int InitPic(void);

@@ -1,8 +1,12 @@
+/**
+ * 参考: https://wiki.osdev.org/8259_PIC
+ */
+
 #include <stdint.h>
 #include "../../include/asmFunc.h"
 #include "./pic.h"
 
-void InitPic(void) {
+int InitPic(void) {
     uint8_t a1 = inb(PIC1_DATA);
     uint8_t a2 = inb(PIC2_DATA);
 
@@ -20,4 +24,12 @@ void InitPic(void) {
 
     outb(PIC1_DATA, 0xFF);
     outb(PIC2_DATA, 0xFF);
+
+    // 在 PIC 初始化完成后尝试通过回读 IMR 验证 PIC 是否能够正常工作
+    uint8_t imr1 = inb(PIC1_DATA);
+    uint8_t imr2 = inb(PIC2_DATA);
+    if (imr1 == 0xFF && imr2 == 0xFF) {
+        return 0;
+    }
+    return -1;
 }

@@ -15,13 +15,24 @@ struct BootInfo {
 void KMain(void) {
     const struct BootInfo *bootInfo = (const struct BootInfo*)0x0FF0;
     initPalette();
+    io_init((uint8_t*)bootInfo->vram, bootInfo->scrnx, bootInfo->scrny);
 
-    showString((uint8_t*)bootInfo->vram, (int)bootInfo->scrnx, 50, 50, bootInfo->scrnx, bootInfo->scrny, "Hello, OS!", 7, -1);
+    setCursor(0, 0);
 
-    InitPic();
+    setTextColor(14);
+    printf("Kernel Inited.");
+
+    setTextColor(10);
+    printf("\n");
+
+    if (InitPic() == 0) {
+        printf("[OK] PIC inited");
+    } else {
+        setTextColor(12); 
+        printf("[FAIL] PIC init error");
+    }
 
     asm_sti();
-
     while(1) {
         asm_hlt();
     }

@@ -1,6 +1,59 @@
 #include "./io.h"
 #include "../../include/asmFunc.h"
 
+static uint8_t* g_vram      = (uint8_t*)0;
+static int      g_scrnx     = 0;
+static int      g_scrny     = 0;
+static int      g_pitch     = 0;
+static int      g_cursor_x  = 0;
+static int      g_cursor_y  = -20;  
+static int      g_text_color = 7; 
+
+#define PRINTF_LINE_GAP 20
+
+void io_init(uint8_t* vram, int scrnx, int scrny) {
+    g_vram      = vram;
+    g_scrnx     = scrnx;
+    g_scrny     = scrny;
+    g_pitch     = scrnx;  
+    g_cursor_x  = 0;
+    g_cursor_y  = -20;
+    g_text_color = 7;
+}
+
+void setTextColor(int color) {
+    g_text_color = color & 0xFF;
+}
+
+void setCursor(int x, int y) {
+    g_cursor_x = x;
+    g_cursor_y = y;
+}
+
+int getCursorX(void) { return g_cursor_x; }
+int getCursorY(void) { return g_cursor_y; }
+
+void printf(const char* s) {
+    while (*s) {
+        if (*s == '\n') {
+            g_cursor_y += PRINTF_LINE_GAP;
+            g_cursor_x = 0;
+        } else {
+            showChar(g_vram, g_pitch,
+                     g_cursor_x, g_cursor_y,
+                     g_scrnx, g_scrny,
+                     *s, g_text_color, -1);
+            g_cursor_x += 8;
+
+            if (g_cursor_x + 8 > g_scrnx) {
+                g_cursor_y += PRINTF_LINE_GAP;
+                g_cursor_x = 0;
+            }
+        }
+        s++;
+    }
+}
+
 void showChar(uint8_t* vram, int pitch, int x, int y, int scrnx, int scrny, char c, int color, int bg) {
     const uint8_t* font = FONT_BASE + ((uint8_t)c) * 16;
 
