@@ -3,6 +3,7 @@
 #include "../../include/asmFunc.h"
 #include "../io/io.h"
 #include "../pic/pic.h"
+#include "../pit/pit.h"
 
 volatile uint32_t g_tick = 0;
 
@@ -74,7 +75,7 @@ void irq_handler(struct Registers* r) {
 
     if (irq == 0) {
         g_tick++;
-        if (g_tick % 18 == 0) {          
+        if (g_tick % PIT_HZ == 0) {    
             setTextColor(10); 
             printf("tick: %d\n", (int)g_tick);
         }

@@ -1,5 +1,7 @@
 #include "./include/asmFunc.h"
+#include "./include/assert.h"
 #include "./initer/pic/pic.h"
+#include "./initer/pit/pit.h"
 #include "./initer/io/io.h"
 #include "./initer/idt/idt.h"
 
@@ -26,12 +28,16 @@ void KMain(void) {
 
     setTextColor(10);
 
-    if (InitPic() == 0) {
+    if (initPic() == 0) {
         printf("[OK] PIC inited\n");
     } else {
         setTextColor(12); 
         printf("[FAIL] PIC init error\n");
     }
+
+    initPIT(PIT_HZ);
+
+    ASSERT(PIT_HZ == 100);
 
     setTextColor(10);
     printf("[OK] Interrupts enabled, PIT timer running...\n");

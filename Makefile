@@ -35,6 +35,9 @@ $(BUILD_DIR)/ioc.o: $(SRC_DIR)/kernel/initer/io/io.c | $(BUILD_DIR)
 $(BUILD_DIR)/pic.o: $(SRC_DIR)/kernel/initer/pic/pic.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/pit.o: $(SRC_DIR)/kernel/initer/pit/pit.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/idt.o: $(SRC_DIR)/kernel/initer/idt/idt.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -44,14 +47,19 @@ $(BUILD_DIR)/interrupt.o: $(SRC_DIR)/kernel/initer/idt/interrupt.c | $(BUILD_DIR
 $(BUILD_DIR)/kernel.o: $(SRC_DIR)/kernel/main.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/assert.o: $(SRC_DIR)/kernel/assert.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/kernel.o \
                          $(BUILD_DIR)/func.o \
                          $(BUILD_DIR)/ioc.o \
 						 $(BUILD_DIR)/io.o \
                          $(BUILD_DIR)/pic.o \
+						 $(BUILD_DIR)/pit.o \
 						 $(BUILD_DIR)/stub.o \
 						 $(BUILD_DIR)/idt.o \
 						 $(BUILD_DIR)/interrupt.o \
+						 $(BUILD_DIR)/assert.o \
                          $(LINKER_DIR)/kernel.ld | $(BUILD_DIR)
 	$(LD) -T $(LINKER_DIR)/kernel.ld -o $@ \
 	      $(BUILD_DIR)/kernel.o \
@@ -59,9 +67,11 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/kernel.o \
 	      $(BUILD_DIR)/ioc.o \
 		  $(BUILD_DIR)/io.o \
 	      $(BUILD_DIR)/pic.o \
+		  $(BUILD_DIR)/pit.o \
 		  $(BUILD_DIR)/stub.o \
 		  $(BUILD_DIR)/idt.o \
-		  $(BUILD_DIR)/interrupt.o		
+	      $(BUILD_DIR)/interrupt.o \
+		  $(BUILD_DIR)/assert.o		
 
 $(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel.elf
 	$(OBJCOPY) -O binary $< $@
