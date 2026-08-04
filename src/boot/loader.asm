@@ -1,4 +1,4 @@
-BOTPAK  equ     0x00280000          
+KERNEL  equ     0x00280000          
 DSKCAC  equ     0x00100000          
 DSKCAC0 equ     0x00008000       
 VBEMODE equ     0x105              
@@ -51,6 +51,34 @@ vbe_fail:
         mov     dword [VRAM], 0x000A0000
 
 vbe_done:
+        mov     ax, 0x1130
+        mov     bh, 0x06
+        int     0x10          
+
+        push    ds
+        push    es
+        push    si
+        push    di
+        push    cx
+
+        mov     ax, es          
+        mov     si, bp           
+
+        mov     bx, 0x1000
+        mov     es, bx
+        xor     di, di
+
+        mov     ds, ax           
+
+        mov     cx, 256 * 16
+        rep     movsb
+
+        pop     cx
+        pop     di
+        pop     si
+        pop     es
+        pop     ds
+
         mov     ah, 0x02
         int     0x16
         mov     [LEDS], al
@@ -109,7 +137,7 @@ pipelineflush:
         mov     cr4, eax
 
         mov     esi, [kernel_addr]
-        mov     edi, BOTPAK
+        mov     edi, KERNEL
         mov     ecx, 512*1024/4     
         call    memcpy
 
@@ -128,7 +156,7 @@ pipelineflush:
 
         mov     esp, STACK_PHYS    
 
-        jmp     DWORD 2*8:BOTPAK
+        jmp     DWORD 2*8:KERNEL
 
 waitkbdout:
         in      al, 0x64
