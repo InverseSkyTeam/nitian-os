@@ -71,18 +71,7 @@ isr_common_stub:
     call isr_handler
     add esp, 4
 
-    pop eax
-    mov gs, ax
-    pop eax
-    mov fs, ax
-    pop eax
-    mov es, ax
-    pop eax
-    mov ds, ax
-
-    popa
-    add esp, 8
-    iret
+    jmp intr_exit
 
 %macro IRQ 2
 global irq%1
@@ -131,6 +120,10 @@ irq_common_stub:
     call irq_handler
     add esp, 4
 
+    jmp intr_exit
+
+global intr_exit
+intr_exit:
     pop eax
     mov gs, ax
     pop eax

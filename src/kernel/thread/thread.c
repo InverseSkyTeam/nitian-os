@@ -2,6 +2,7 @@
 #include "./thread.h"
 #include "../lib/str/str.h"
 #include "../memory/pool/pool.h"
+#include "../userprog/process.h"
 #include "../include/asmFunc.h"
 #include "../include/assert.h"
 
@@ -23,16 +24,16 @@ static void kernel_thread_entry(thread_func function, void* arg) {
     }
 }
 
-static struct task_struct* create_task(char* name, uint8_t priority, thread_func function, void* arg) {
+struct task_struct* thread_create(char* name, uint8_t priority, thread_func function, void* arg) {
     struct task_struct* t = &g_task_table[g_task_count++];
-    uint32_t stack = (uint32_t)palloc_pages(&kernel_pool, THREAD_STACK_SIZE / PAGE_SIZE);
+    uint32_t stack = (uint32_t)get_kernel_pages(THREAD_STACK_SIZE / PAGE_SIZE);
     struct thread_stack* ts = (struct thread_stack*)(stack + THREAD_STACK_SIZE - sizeof(struct thread_stack));
     ts->eflags = 0x202;
     ts->esi = 0;
     ts->edi = 0;
     ts->ebx = 0;
     ts->ebp = 0;
-    ts->eip = kernel_thread_entry;
+    ts->eip = (void (*)(void))kernel_thread_entry;
     ts->unused_retaddr = 0;
     ts->function = function;
     ts->func_arg = arg;
@@ -42,6 +43,8 @@ static struct task_struct* create_task(char* name, uint8_t priority, thread_func
     t->priority = priority;
     t->ticks = priority;
     t->elapsed_ticks = 0;
+    t->kernel_stack_top = stack + THREAD_STACK_SIZE;
+    t->pgdir = 0;
     t->stack_magic = STACK_MAGIC;
     list_append(&g_ready_list, &t->general_tag);
     return t;
@@ -56,12 +59,14 @@ void thread_init(void) {
     g_task_table[0].priority = 5;
     g_task_table[0].ticks = 5;
     g_task_table[0].elapsed_ticks = 0;
+    g_task_table[0].kernel_stack_top = 0;
+    g_task_table[0].pgdir = 0;
     g_task_table[0].stack_magic = STACK_MAGIC;
     g_task_count = 1;
 }
 
 void kernel_thread(char* name, uint8_t priority, thread_func function, void* arg) {
-    create_task(name, priority, function, arg);
+    thread_create(name, priority, function, arg);
 }
 
 void thread_block(void) {
@@ -110,5 +115,6 @@ void schedule(void) {
     next->status = TASK_RUNNING;
     struct task_struct* prev = current_task;
     current_task = next;
+    process_activate(next);
     switch_to(&prev->self_kstack, &next->self_kstack);
 }

@@ -30,6 +30,9 @@
 | 同步机制 | `thread/sync`：信号量 `sema_down/up` 与可重入锁 `lock_acquire/release`，关中断保证原子性（参考第11章） |
 | 环形缓冲区 | `device/ioqueue`：生产者-消费者模型，满/空时阻塞等待，`ioq_putchar`/`ioq_getchar`（参考第11章） |
 | 键盘驱动 | `device/keyboard` + IRQ1 分发：8042 扫描码 → 双键位 keymap（shift/caps），字符写入键盘环形缓冲区 |
+| 任务状态段 (TSS) | `initer/gdt` 重建内核 GDT（数据/代码/TSS/用户段描述符）；`initer/tss` 传统 104 字节 TSS，`ltr` 加载 TR，为 ring3 用户进程的中断栈切换准备 esp0/ss0（参考第11章） |
+| 用户进程 | `userprog/process`：`process_execute` 创建进程（独立页目录 + 用户虚拟地址位图 + ring3 栈），`start_process` 用 `intr_exit` 模拟中断返回降特权级进入用户态，`schedule` 中 `process_activate` 切换页表并更新 TSS.esp0；PIT 中断驱动抢占式调度（参考第11章） |
+| 内核虚拟堆 | `memory/pool` 的 `get_kernel_pages`：高半区 `0xC1000000` 起虚拟地址池，任务内核栈/位图都在此处（用户进程页表可见，保证切换安全） |
 
 ## 目录结构
 
@@ -67,7 +70,9 @@ NiTianOS/
 │           ├── io/         # 屏幕与 printf
 │           ├── pic/        # 8259A PIC
 │           ├── pit/        # 8253/8254 定时器
-│           └── idt/        # IDT 与中断处理
+│           ├── idt/        # IDT 与中断处理
+│           ├── gdt/        # 内核 GDT 表与描述符构造
+│           └── tss/        # 任务状态段（esp0/ss0，ltr 加载 TR）
 └── build/                  # 构建产物（floppy.img 等）
 ```
 
@@ -114,9 +119,9 @@ qemu-system-i386 -m 4G -fda build/floppy.img
 
 ## 路线图
 
-- [x] 内存管理：物理内存探测（E820）、位图、分页、Higher Half 映射、物理内存池
+- [x] 内存管理：物理内存探测（E820）、位图、分页、Higher Half 映射、物理内存池、内核虚拟堆
 - [x] 输入输出系统：内核线程与调度、信号量与锁、环形缓冲区（生产者-消费者）、键盘驱动（IRQ1）
-- [ ] 内核堆分配器（基于内存池）
+- [x] 用户进程：TSS、独立页目录、ring3 特权级切换（intr_exit 模拟中断返回）、抢占式调度
 - [ ] 系统调用（int 0x80）
-- [ ] 简单进程调度
+- [ ] 内核堆分配器（基于内存池）
 - [ ] 文件系统

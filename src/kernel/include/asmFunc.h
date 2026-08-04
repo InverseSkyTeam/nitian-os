@@ -14,3 +14,7 @@ extern void asm_write_cr3(uint32_t cr3);
 
 extern uint32_t asm_save_eflags(void);
 extern void asm_restore_eflags(uint32_t eflags);
+
+extern void asm_lgdt(uint32_t gdtr_ptr);
+extern void asm_ltr(uint16_t sel);
+extern uint16_t asm_str(void);

@@ -49,3 +49,20 @@ asm_restore_eflags:
         push    eax
         popfd
         ret
+
+global asm_lgdt
+asm_lgdt:
+        mov     eax, [esp+4]
+        lgdt    [eax]
+        ret
+
+global asm_ltr
+asm_ltr:
+        mov     ax, [esp+4]
+        ltr     ax
+        ret
+
+global asm_str
+asm_str:
+        str     eax
+        ret

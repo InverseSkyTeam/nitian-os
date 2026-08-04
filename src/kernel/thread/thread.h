@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include "../lib/list/list.h"
+#include "../memory/pool/pool.h"
 
 #define THREAD_STACK_SIZE 0x2000
 #define MAX_TASKS 64
@@ -24,7 +25,7 @@ struct thread_stack {
     uint32_t edi;
     uint32_t ebx;
     uint32_t ebp;
-    void (*eip)(thread_func, void*);
+    void (*eip)(void);
     void (*unused_retaddr);
     thread_func function;
     void* func_arg;
@@ -38,6 +39,9 @@ struct task_struct {
     uint8_t ticks;
     uint32_t elapsed_ticks;
     struct list_elem general_tag;
+    uint32_t kernel_stack_top;
+    uint32_t pgdir;
+    struct virtual_addr userprog_v_addr;
     uint32_t stack_magic;
 };
 
@@ -45,6 +49,7 @@ extern struct task_struct* current_task;
 
 void thread_init(void);
 void kernel_thread(char* name, uint8_t priority, thread_func function, void* arg);
+struct task_struct* thread_create(char* name, uint8_t priority, thread_func function, void* arg);
 void schedule(void);
 void switch_to(uint32_t** cur_kstack, uint32_t** next_kstack);
 void thread_block(void);

@@ -4,6 +4,9 @@
 #include "./initer/pit/pit.h"
 #include "./initer/io/io.h"
 #include "./initer/idt/idt.h"
+#include "./initer/gdt/gdt.h"
+#include "./initer/tss/tss.h"
+#include "./initer/idt/interrupt.h"
 #include "./lib/str/str.h"
 #include "./memory/bitmap/bitmap.h"
 #include "./memory/pool/pool.h"
@@ -11,6 +14,7 @@
 #include "./thread/sync.h"
 #include "./device/ioqueue.h"
 #include "./device/keyboard.h"
+#include "./userprog/process.h"
 
 struct BootInfo {
     uint8_t  cyls;
@@ -94,12 +98,51 @@ static void kbd_consumer(void* arg) {
     }
 }
 
+static int test_var_a = 0;
+static int test_var_b = 0;
+
+static void u_prog_a(void) {
+    for (;;) {
+        test_var_a++;
+    }
+}
+
+static void u_prog_b(void) {
+    for (;;) {
+        test_var_b++;
+    }
+}
+
+static void k_thread_a(void* arg) {
+    for (;;) {
+        if (g_tick % PIT_HZ == 0) {
+            setTextColor(11);
+            printf("k_a: user_var_a=%d\n", test_var_a);
+        }
+        thread_yield();
+    }
+}
+
+static void k_thread_b(void* arg) {
+    for (;;) {
+        if (g_tick % PIT_HZ == 0) {
+            setTextColor(9);
+            printf("k_b: user_var_b=%d\n", test_var_b);
+        }
+        thread_yield();
+    }
+}
+
 void KMain(void) {
     const struct BootInfo *bootInfo = (const struct BootInfo*)0x0FF0;
     initPalette();
     initIO((uint8_t*)bootInfo->vram, bootInfo->scrnx, bootInfo->scrny);
     initIDT();
     mm_init();
+    gdt_init();
+    tss_init();
+    setTextColor(10);
+    printf("[OK] TSS loaded, TR=0x%x esp0=0x%x\n", (uint32_t)asm_str(), tss.esp0);
 
     setCursor(0, 0);
 
@@ -169,8 +212,13 @@ void KMain(void) {
     kernel_thread("consumer", 3, demo_consumer, 0);
     kernel_thread("kbd",      4, kbd_consumer, 0);
 
+    process_execute((void*)u_prog_a, "u_prog_a");
+    process_execute((void*)u_prog_b, "u_prog_b");
+    kernel_thread("k_a", 4, k_thread_a, 0);
+    kernel_thread("k_b", 4, k_thread_b, 0);
+
     setTextColor(10);
-    printf("[OK] producer/consumer + keyboard echo started, type to see [KBD] lines\n");
+    printf("[OK] user processes + demo threads started, type to see [KBD] lines\n");
 
     asm_sti();
     for (;;) {

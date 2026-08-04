@@ -64,7 +64,7 @@ vbe_done:
         mov     ax, es
         mov     si, bp
 
-        mov     bx, 0x1100
+        mov     bx, 0x9C00
         mov     es, bx
         xor     di, di
 

@@ -5,6 +5,7 @@
 #include "../pic/pic.h"
 #include "../pit/pit.h"
 #include "../../device/keyboard.h"
+#include "../../thread/thread.h"
 
 volatile uint32_t g_tick = 0;
 
@@ -73,20 +74,23 @@ void isr_handler(struct Registers* r) {
 void irq_handler(struct Registers* r) {
     uint32_t irq = r->int_no - 32;
 
+    if (irq >= 8) {
+        outb(PIC2_CMD, 0x20);
+    }
+    outb(PIC1_CMD, 0x20);
+
     if (irq == 0) {
         g_tick++;
         if (g_tick % PIT_HZ == 0) {
             setTextColor(10);
             printf("tick: %d\n", (int)g_tick);
         }
+        if (current_task != 0) {
+            schedule();
+        }
     }
 
     if (irq == 1) {
         keyboard_handler();
     }
-
-    if (irq >= 8) {
-        outb(PIC2_CMD, 0x20);
-    }
-    outb(PIC1_CMD, 0x20);
 }

@@ -17,6 +17,7 @@ KERNEL_HDRS := $(wildcard $(SRC_DIR)/kernel/include/*.h \
                          $(SRC_DIR)/kernel/memory/*/*.h \
                          $(SRC_DIR)/kernel/thread/*.h \
                          $(SRC_DIR)/kernel/device/*.h \
+                         $(SRC_DIR)/kernel/userprog/*.h \
                          $(SRC_DIR)/kernel/initer/*/*.h)
 
 $(BUILD_DIR):
@@ -88,6 +89,15 @@ $(BUILD_DIR)/ioqueue.o: $(SRC_DIR)/kernel/device/ioqueue.c $(KERNEL_HDRS) | $(BU
 $(BUILD_DIR)/keyboard.o: $(SRC_DIR)/kernel/device/keyboard.c $(KERNEL_HDRS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/gdt.o: $(SRC_DIR)/kernel/initer/gdt/gdt.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/tss.o: $(SRC_DIR)/kernel/initer/tss/tss.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/process.o: $(SRC_DIR)/kernel/userprog/process.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
                          $(BUILD_DIR)/kernel.o \
                          $(BUILD_DIR)/func.o \
@@ -108,6 +118,9 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 						 $(BUILD_DIR)/sync.o \
 						 $(BUILD_DIR)/ioqueue.o \
 						 $(BUILD_DIR)/keyboard.o \
+						 $(BUILD_DIR)/gdt.o \
+						 $(BUILD_DIR)/tss.o \
+						 $(BUILD_DIR)/process.o \
                          $(LINKER_DIR)/kernel.ld | $(BUILD_DIR)
 	$(LD) -T $(LINKER_DIR)/kernel.ld -o $@ \
 	      $(BUILD_DIR)/entry.o \
@@ -129,7 +142,10 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 		  $(BUILD_DIR)/thread.o \
 		  $(BUILD_DIR)/sync.o \
 		  $(BUILD_DIR)/ioqueue.o \
-		  $(BUILD_DIR)/keyboard.o
+		  $(BUILD_DIR)/keyboard.o \
+		  $(BUILD_DIR)/gdt.o \
+		  $(BUILD_DIR)/tss.o \
+		  $(BUILD_DIR)/process.o
 
 $(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel.elf
 	$(OBJCOPY) -O binary $< $@
@@ -158,5 +174,4 @@ run: floppy
 clean:
 	rm -rf $(BUILD_DIR)
 
-# 头文件依赖(由 -MMD 生成), 保证修改 .h 后对应 .o 自动重编
 -include $(BUILD_DIR)/*.d

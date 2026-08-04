@@ -29,7 +29,7 @@ entry_start:
         shl     eax, 22
 .fill:
         mov     [edi], eax
-        or      dword [edi], 3
+        or      dword [edi], 7
         add     eax, 0x1000
         add     edi, 4
         loop    .fill
@@ -45,7 +45,7 @@ entry_start:
         xor     ebx, ebx
 .hi_loop:
         mov     eax, esi
-        or      eax, 3
+        or      eax, 7
         mov     [0x400C00 + ebx*4], eax
         push    edi
         push    ebx
@@ -55,7 +55,7 @@ entry_start:
         xor     eax, eax
 .fill_hi:
         mov     [edi], eax
-        or      dword [edi], 3
+        or      dword [edi], 7
         add     eax, 0x1000
         add     edi, 4
         loop    .fill_hi
@@ -78,10 +78,14 @@ entry_start:
         mov     ecx, 1024
 .fill_vram:
         mov     [edi], eax
-        or      dword [edi], 3
+        or      dword [edi], 7
         add     eax, 0x1000
         add     edi, 4
         loop    .fill_vram
+
+        mov     eax, 0x400000
+        or      eax, 3
+        mov     [0x400FFC], eax
 
         mov     eax, 0x400000
         mov     cr3, eax
