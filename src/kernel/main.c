@@ -4,6 +4,8 @@
 #include "./initer/pit/pit.h"
 #include "./initer/io/io.h"
 #include "./initer/idt/idt.h"
+#include "./lib/str/str.h"
+#include "./memory/bitmap/bitmap.h"
 
 struct BootInfo {
     uint8_t  cyls;
@@ -38,6 +40,31 @@ void KMain(void) {
     initPIT(PIT_HZ);
 
     ASSERT(PIT_HZ == 100);
+
+    char buf[64];
+    strcpy(buf, "NiTianOS");
+    ASSERT(strlen(buf) == 8);
+    ASSERT(strcmp(buf, "NiTianOS") == 0);
+    ASSERT(strcmp(buf, "NiTianOSx") < 0);
+    strcat(buf, " v0.1");
+    ASSERT(strlen(buf) == 13);
+    printf("[OK] str: [%s] len=%d\n", buf, (int)strlen(buf));
+
+    uint8_t pool[64];
+    struct bitmap bm;
+    bm.btmp_bytes_len = sizeof(pool);
+    bm.bits = pool;
+    bitmap_init(&bm);
+    ASSERT(bitmap_scan_test(&bm, 0) == 0);
+    int b0 = bitmap_scan(&bm, 3);
+    ASSERT(b0 == 0);
+    bitmap_set(&bm, 2, 1);
+    ASSERT(bitmap_scan_test(&bm, 2) == 1);
+    int b1 = bitmap_scan(&bm, 3);
+    ASSERT(b1 == 3);
+    memset(pool, 0xFF, sizeof(pool));
+    ASSERT(bitmap_scan(&bm, 1) == -1);
+    printf("[OK] bitmap: scan3=%d set2->scan3=%d full=-1\n", b0, b1);
 
     setTextColor(10);
     printf("[OK] Interrupts enabled, PIT timer running...\n");

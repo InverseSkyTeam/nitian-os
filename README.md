@@ -26,7 +26,7 @@
 ## 目录结构
 
 ```
-ins-os/
+NiTianOS/
 ├── Makefile                # 交叉编译构建（nasm + zig cc + ld.lld）
 ├── linker/
 │   └── kernel.ld           # 内核链接脚本
