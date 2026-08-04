@@ -7,8 +7,8 @@ static int      g_scrnx     = 0;
 static int      g_scrny     = 0;
 static int      g_pitch     = 0;
 static int      g_cursor_x  = 0;
-static int      g_cursor_y  = -20;  
-static int      g_text_color = 7; 
+static int      g_cursor_y  = -20;
+static int      g_text_color = 7;
 
 #define PRINTF_LINE_GAP 20
 
@@ -16,7 +16,7 @@ void initIO(uint8_t* vram, int scrnx, int scrny) {
     g_vram      = vram;
     g_scrnx     = scrnx;
     g_scrny     = scrny;
-    g_pitch     = scrnx;  
+    g_pitch     = scrnx;
     g_cursor_x  = 0;
     g_cursor_y  = -20;
     g_text_color = 7;
@@ -79,7 +79,7 @@ static void printUnsigned(uint32_t v, int base, int upper,
         while (pad--) putc(' ');
         if (hexPrefix) { putc('0'); putc(upper ? 'X' : 'x'); }
     }
-    while (n--) putc(buf[n]);  
+    while (n--) putc(buf[n]);
 }
 
 static void printSigned(int v, int width, int pad0) {
@@ -88,7 +88,7 @@ static void printSigned(int v, int width, int pad0) {
     char buf[12];
     int n = 0;
 
-    if (v < 0) { neg = 1; uv = 0u - uv; } 
+    if (v < 0) { neg = 1; uv = 0u - uv; }
     if (uv == 0) {
         buf[n++] = '0';
     } else {
@@ -129,7 +129,7 @@ void printf(const char* fmt, ...) {
             width = width * 10 + (*fmt - '0');
             ++fmt;
         }
-        if (*fmt == 'l') ++fmt;          
+        if (*fmt == 'l') ++fmt;
 
         switch (*fmt) {
         case 'd': printSigned(va_arg(ap, int), width, pad0); break;
@@ -145,7 +145,7 @@ void printf(const char* fmt, ...) {
             break;
         }
         case '%': putc('%'); break;
-        case '\0': --fmt; break;           
+        case '\0': --fmt; break;
         default:  putc('%'); putc(*fmt); break;
         }
     }

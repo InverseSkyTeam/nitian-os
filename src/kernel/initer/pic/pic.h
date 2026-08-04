@@ -5,7 +5,7 @@
 
 #define ICW1_ICW4      0x01
 #define ICW1_INIT      0x10
-#define ICW1_INIT_NEED_ICW4 (ICW1_INIT | ICW1_ICW4) 
+#define ICW1_INIT_NEED_ICW4 (ICW1_INIT | ICW1_ICW4)
 
 #define ICW4_8086      0x01
 

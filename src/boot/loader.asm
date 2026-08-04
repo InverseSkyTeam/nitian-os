@@ -1,7 +1,7 @@
-KERNEL  equ     0x00280000          
-DSKCAC  equ     0x00100000          
-DSKCAC0 equ     0x00008000       
-VBEMODE equ     0x105              
+KERNEL  equ     0x00280000
+DSKCAC  equ     0x00100000
+DSKCAC0 equ     0x00008000
+VBEMODE equ     0x105
 VBEINFO equ     0x0FF0 - 256
 
 CYLS    equ     0x0FF0
@@ -13,7 +13,7 @@ VRAM    equ     0x0FF8
 
 STACK_PHYS equ  0x00090000
 
-        org     0xC200              
+        org     0xC200
 
 kernel_addr:    dd      0
 
@@ -53,7 +53,7 @@ vbe_fail:
 vbe_done:
         mov     ax, 0x1130
         mov     bh, 0x06
-        int     0x10          
+        int     0x10
 
         push    ds
         push    es
@@ -61,14 +61,14 @@ vbe_done:
         push    di
         push    cx
 
-        mov     ax, es          
-        mov     si, bp           
+        mov     ax, es
+        mov     si, bp
 
         mov     bx, 0x1000
         mov     es, bx
         xor     di, di
 
-        mov     ds, ax           
+        mov     ds, ax
 
         mov     cx, 256 * 16
         rep     movsb
@@ -119,8 +119,8 @@ vbe_done:
         lgdt    [GDTR0]
         lidt    [IDTR0]
         mov     eax, cr0
-        and     eax, 0x7FFFFFFF      
-        or      eax, 0x00000001      
+        and     eax, 0x7FFFFFFF
+        or      eax, 0x00000001
         mov     cr0, eax
         jmp     pipelineflush
 
@@ -138,7 +138,7 @@ pipelineflush:
 
         mov     esi, [kernel_addr]
         mov     edi, KERNEL
-        mov     ecx, 512*1024/4     
+        mov     ecx, 512*1024/4
         call    memcpy
 
         mov     esi, 0x7C00
@@ -154,7 +154,7 @@ pipelineflush:
         sub     ecx, 512/4
         call    memcpy
 
-        mov     esp, STACK_PHYS    
+        mov     esp, STACK_PHYS
 
         jmp     DWORD 2*8:KERNEL
 
@@ -177,24 +177,24 @@ memcpy:
 
 IDT0:
     %rep 256
-        dw  default_handler 
-        dw  0x08                 
-        db  0                      
-        db  0x8E                   
+        dw  default_handler
+        dw  0x08
+        db  0
+        db  0x8E
         dw  0
     %endrep
 
 IDTR0:
-    dw  256*8 - 1     
-    dd  IDT0         
+    dw  256*8 - 1
+    dd  IDT0
 
 default_handler:
     iret
 
 GDT0:
-    db 0, 0, 0, 0, 0, 0, 0, 0     
-    dw 0xFFFF, 0x0000, 0x9200, 0x00CF 
-    dw 0xFFFF, 0x0000, 0x9A00, 0x00CF 
+    db 0, 0, 0, 0, 0, 0, 0, 0
+    dw 0xFFFF, 0x0000, 0x9200, 0x00CF
+    dw 0xFFFF, 0x0000, 0x9A00, 0x00CF
 
         dw      0
 GDTR0:

@@ -4,15 +4,15 @@ section .text
 %macro ISR_NOERR 1
 global isr%1
 isr%1:
-    push dword 0        
-    push dword %1         
+    push dword 0
+    push dword %1
     jmp isr_common_stub
 %endmacro
 
 %macro ISR_ERR 1
 global isr%1
 isr%1:
-    push dword %1         
+    push dword %1
     jmp isr_common_stub
 %endmacro
 
@@ -61,14 +61,13 @@ isr_common_stub:
     mov ax, gs
     push eax
 
-    
     mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
-    push esp              
+    push esp
     call isr_handler
     add esp, 4
 
@@ -82,14 +81,14 @@ isr_common_stub:
     mov ds, ax
 
     popa
-    add esp, 8            
+    add esp, 8
     iret
 
 %macro IRQ 2
 global irq%1
 irq%1:
-    push dword 0          
-    push dword %2         
+    push dword 0
+    push dword %2
     jmp irq_common_stub
 %endmacro
 

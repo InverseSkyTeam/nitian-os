@@ -7,7 +7,7 @@ inb:
     in al, dx
     ret
 
-global outb  
+global outb
 outb:
     mov dx, [esp + 4]
     mov al, [esp + 8]

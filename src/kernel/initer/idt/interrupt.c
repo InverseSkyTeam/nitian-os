@@ -7,40 +7,39 @@
 
 volatile uint32_t g_tick = 0;
 
-/* CPU 异常名 */
 static const char* g_exc_names[32] = {
-    "Divide Error",             /* 0  #DE */
-    "Debug",                    /* 1  #DB */
-    "Non-Maskable Interrupt",   /* 2  NMI */
-    "Breakpoint",               /* 3  #BP */
-    "Overflow",                 /* 4  #OF */
-    "BOUND Range Exceeded",     /* 5  #BR */
-    "Invalid Opcode",           /* 6  #UD */
-    "Device Not Available",     /* 7  #NM */
-    "Double Fault",             /* 8  #DF */
-    "Coprocessor Seg Overrun",  /* 9  (保留) */
-    "Invalid TSS",              /* 10 #TS */
-    "Segment Not Present",      /* 11 #NP */
-    "Stack-Segment Fault",      /* 12 #SS */
-    "General Protection",       /* 13 #GP */
-    "Page Fault",               /* 14 #PF */
-    "(Reserved)",               /* 15 */
-    "x87 FP Error",             /* 16 #MF */
-    "Alignment Check",          /* 17 #AC */
-    "Machine Check",            /* 18 #MC */
-    "SIMD FP Exception",        /* 19 #XF */
-    "Virtualization Exception", /* 20 #VE */
-    "Control Protection",       /* 21 #CP */
-    "(Reserved)",               /* 22 */
-    "(Reserved)",               /* 23 */
-    "(Reserved)",               /* 24 */
-    "(Reserved)",               /* 25 */
-    "(Reserved)",               /* 26 */
-    "(Reserved)",               /* 27 */
-    "(Reserved)",               /* 28 */
-    "(Reserved)",               /* 29 */
-    "(Reserved)",               /* 30 */
-    "(Reserved)"                /* 31 */
+    "Divide Error",
+    "Debug",
+    "Non-Maskable Interrupt",
+    "Breakpoint",
+    "Overflow",
+    "BOUND Range Exceeded",
+    "Invalid Opcode",
+    "Device Not Available",
+    "Double Fault",
+    "Coprocessor Seg Overrun",
+    "Invalid TSS",
+    "Segment Not Present",
+    "Stack-Segment Fault",
+    "General Protection",
+    "Page Fault",
+    "(Reserved)",
+    "x87 FP Error",
+    "Alignment Check",
+    "Machine Check",
+    "SIMD FP Exception",
+    "Virtualization Exception",
+    "Control Protection",
+    "(Reserved)",
+    "(Reserved)",
+    "(Reserved)",
+    "(Reserved)",
+    "(Reserved)",
+    "(Reserved)",
+    "(Reserved)",
+    "(Reserved)",
+    "(Reserved)",
+    "(Reserved)"
 };
 
 #define INT_NO_UNREGISTERED 0xFFFFu
@@ -75,8 +74,8 @@ void irq_handler(struct Registers* r) {
 
     if (irq == 0) {
         g_tick++;
-        if (g_tick % PIT_HZ == 0) {    
-            setTextColor(10); 
+        if (g_tick % PIT_HZ == 0) {
+            setTextColor(10);
             printf("tick: %d\n", (int)g_tick);
         }
     }

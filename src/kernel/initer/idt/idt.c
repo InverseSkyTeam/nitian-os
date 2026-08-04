@@ -12,8 +12,8 @@ static void setIDT(uint8_t vec, void (*handler)(void), uint8_t type) {
     uint32_t addr = (uint32_t)handler;
 
     idt[vec].offset_low  = (uint16_t)(addr & 0xFFFF);
-    idt[vec].selector    = 0x10;            
-    idt[vec].ist         = 0;              
+    idt[vec].selector    = 0x10;
+    idt[vec].ist         = 0;
     idt[vec].type        = type;
     idt[vec].offset_high = (uint16_t)((addr >> 16) & 0xFFFF);
 }
@@ -75,7 +75,7 @@ void initIDT(void) {
 
     setIDT(0x80, default_handler, IDT_TYPE_TRAP_GATE3);
 
-    idtr0.limit = (uint16_t)(sizeof(idt) - 1);  
+    idtr0.limit = (uint16_t)(sizeof(idt) - 1);
     idtr0.base  = (uint32_t)idt;
     __asm__ volatile("lidt %0" : : "m"(idtr0) : "memory");
 }

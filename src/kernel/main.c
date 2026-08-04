@@ -6,6 +6,8 @@
 #include "./initer/idt/idt.h"
 #include "./lib/str/str.h"
 #include "./memory/bitmap/bitmap.h"
+#include "./memory/paging/paging.h"
+#include "./memory/pool/pool.h"
 
 struct BootInfo {
     uint8_t  cyls;
@@ -21,7 +23,9 @@ void KMain(void) {
     const struct BootInfo *bootInfo = (const struct BootInfo*)0x0FF0;
     initPalette();
     initIO((uint8_t*)bootInfo->vram, bootInfo->scrnx, bootInfo->scrny);
-    initIDT();         
+    initIDT();
+    init_paging(bootInfo->vram);
+    mm_init();
 
     setCursor(0, 0);
 
@@ -29,11 +33,12 @@ void KMain(void) {
     printf("Kernel Inited.\n");
 
     setTextColor(10);
+    printf("[OK] Paging enabled (identity 0-256MB + vram)\n");
 
     if (initPic() == 0) {
         printf("[OK] PIC inited\n");
     } else {
-        setTextColor(12); 
+        setTextColor(12);
         printf("[FAIL] PIC init error\n");
     }
 
@@ -65,6 +70,19 @@ void KMain(void) {
     memset(pool, 0xFF, sizeof(pool));
     ASSERT(bitmap_scan(&bm, 1) == -1);
     printf("[OK] bitmap: scan3=%d set2->scan3=%d full=-1\n", b0, b1);
+
+    void* p1 = palloc(&kernel_pool);
+    void* p2 = palloc(&kernel_pool);
+    void* p3 = palloc(&kernel_pool);
+    ASSERT(p1 != 0 && p2 != 0 && p3 != 0);
+    ASSERT((uint32_t)p1 % PAGE_SIZE == 0);
+    ASSERT(p1 != p2 && p2 != p3 && p1 != p3);
+    printf("[OK] palloc: %x %x %x\n", (uint32_t)p1, (uint32_t)p2, (uint32_t)p3);
+    uint32_t freed = (uint32_t)p2;
+    pfree(&kernel_pool, freed);
+    void* p4 = palloc(&kernel_pool);
+    ASSERT((uint32_t)p4 == freed);
+    printf("[OK] pfree/realloc: %x\n", (uint32_t)p4);
 
     setTextColor(10);
     printf("[OK] Interrupts enabled, PIT timer running...\n");

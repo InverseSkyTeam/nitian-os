@@ -17,3 +17,22 @@ global asm_stihlt
 asm_stihlt: sti
             hlt
             ret
+
+global asm_read_cr0
+asm_read_cr0:
+        mov     eax, cr0
+        ret
+
+global asm_write_cr0
+asm_write_cr0:
+        mov     eax, [esp+4]
+        mov     cr0, eax
+        jmp     .flush
+.flush:
+        ret
+
+global asm_write_cr3
+asm_write_cr3:
+        mov     eax, [esp+4]
+        mov     cr3, eax
+        ret
