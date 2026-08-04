@@ -1,6 +1,7 @@
 #include "./include/asmFunc.h"
 #include "./initer/pic/pic.h"
 #include "./initer/io/io.h"
+#include "./initer/idt/idt.h"
 
 struct BootInfo {
     uint8_t  cyls;
@@ -15,22 +16,25 @@ struct BootInfo {
 void KMain(void) {
     const struct BootInfo *bootInfo = (const struct BootInfo*)0x0FF0;
     initPalette();
-    io_init((uint8_t*)bootInfo->vram, bootInfo->scrnx, bootInfo->scrny);
+    initIO((uint8_t*)bootInfo->vram, bootInfo->scrnx, bootInfo->scrny);
+    initIDT();         
 
     setCursor(0, 0);
 
     setTextColor(14);
-    printf("Kernel Inited.");
+    printf("Kernel Inited.\n");
 
     setTextColor(10);
-    printf("\n");
 
     if (InitPic() == 0) {
-        printf("[OK] PIC inited");
+        printf("[OK] PIC inited\n");
     } else {
         setTextColor(12); 
-        printf("[FAIL] PIC init error");
+        printf("[FAIL] PIC init error\n");
     }
+
+    setTextColor(10);
+    printf("[OK] Interrupts enabled, PIT timer running...\n");
 
     asm_sti();
     while(1) {

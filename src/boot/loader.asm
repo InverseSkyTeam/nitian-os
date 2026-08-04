@@ -178,7 +178,7 @@ memcpy:
 IDT0:
     %rep 256
         dw  default_handler 
-        dw  2*8                       
+        dw  0x08                 
         db  0                      
         db  0x8E                   
         dw  0

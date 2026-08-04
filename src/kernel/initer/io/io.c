@@ -1,5 +1,6 @@
 #include "./io.h"
 #include "../../include/asmFunc.h"
+#include <stdarg.h>
 
 static uint8_t* g_vram      = (uint8_t*)0;
 static int      g_scrnx     = 0;
@@ -11,7 +12,7 @@ static int      g_text_color = 7;
 
 #define PRINTF_LINE_GAP 20
 
-void io_init(uint8_t* vram, int scrnx, int scrny) {
+void initIO(uint8_t* vram, int scrnx, int scrny) {
     g_vram      = vram;
     g_scrnx     = scrnx;
     g_scrny     = scrny;
@@ -33,25 +34,122 @@ void setCursor(int x, int y) {
 int getCursorX(void) { return g_cursor_x; }
 int getCursorY(void) { return g_cursor_y; }
 
-void printf(const char* s) {
-    while (*s) {
-        if (*s == '\n') {
+static void putc(char c) {
+    if (c == '\n') {
+        g_cursor_y += PRINTF_LINE_GAP;
+        g_cursor_x = 0;
+    } else {
+        showChar(g_vram, g_pitch,
+                 g_cursor_x, g_cursor_y,
+                 g_scrnx, g_scrny,
+                 c, g_text_color, -1);
+        g_cursor_x += 8;
+
+        if (g_cursor_x + 8 > g_scrnx) {
             g_cursor_y += PRINTF_LINE_GAP;
             g_cursor_x = 0;
-        } else {
-            showChar(g_vram, g_pitch,
-                     g_cursor_x, g_cursor_y,
-                     g_scrnx, g_scrny,
-                     *s, g_text_color, -1);
-            g_cursor_x += 8;
-
-            if (g_cursor_x + 8 > g_scrnx) {
-                g_cursor_y += PRINTF_LINE_GAP;
-                g_cursor_x = 0;
-            }
         }
-        s++;
     }
+}
+
+static void printUnsigned(uint32_t v, int base, int upper,
+                          int width, int pad0, int hexPrefix) {
+    static const char lo[] = "0123456789abcdef";
+    static const char up[] = "0123456789ABCDEF";
+    const char* digits = upper ? up : lo;
+    char buf[33];
+    int n = 0;
+
+    if (v == 0) {
+        buf[n++] = '0';
+    } else {
+        while (v) {
+            buf[n++] = digits[v % base];
+            v /= base;
+        }
+    }
+
+    int body = (hexPrefix ? 2 : 0) + n;
+    int pad  = (width > body) ? (width - body) : 0;
+
+    if (pad0) {
+        if (hexPrefix) { putc('0'); putc(upper ? 'X' : 'x'); }
+        while (pad--) putc('0');
+    } else {
+        while (pad--) putc(' ');
+        if (hexPrefix) { putc('0'); putc(upper ? 'X' : 'x'); }
+    }
+    while (n--) putc(buf[n]);  
+}
+
+static void printSigned(int v, int width, int pad0) {
+    unsigned int uv = (unsigned int)v;
+    int neg = 0;
+    char buf[12];
+    int n = 0;
+
+    if (v < 0) { neg = 1; uv = 0u - uv; } 
+    if (uv == 0) {
+        buf[n++] = '0';
+    } else {
+        while (uv) { buf[n++] = '0' + uv % 10; uv /= 10; }
+    }
+
+    int body = neg + n;
+    int pad  = (width > body) ? (width - body) : 0;
+
+    if (pad0) {
+        if (neg) putc('-');
+        while (pad--) putc('0');
+    } else {
+        while (pad--) putc(' ');
+        if (neg) putc('-');
+    }
+    while (n--) putc(buf[n]);
+}
+
+void printf(const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+
+    for (; *fmt; ++fmt) {
+        if (*fmt != '%') {
+            putc(*fmt);
+            continue;
+        }
+        ++fmt;
+
+        int pad0 = 0, hexPre = 0, width = 0;
+        for (;;) {
+            if (*fmt == '0')      { pad0 = 1;  ++fmt; }
+            else if (*fmt == '#') { hexPre = 1; ++fmt; }
+            else break;
+        }
+        while (*fmt >= '0' && *fmt <= '9') {
+            width = width * 10 + (*fmt - '0');
+            ++fmt;
+        }
+        if (*fmt == 'l') ++fmt;          
+
+        switch (*fmt) {
+        case 'd': printSigned(va_arg(ap, int), width, pad0); break;
+        case 'u': printUnsigned(va_arg(ap, unsigned int), 10, 0, width, pad0, 0); break;
+        case 'x': printUnsigned(va_arg(ap, unsigned int), 16, 0, width, pad0, hexPre); break;
+        case 'X': printUnsigned(va_arg(ap, unsigned int), 16, 1, width, pad0, hexPre); break;
+        case 'o': printUnsigned(va_arg(ap, unsigned int), 8, 0, width, pad0, 0); break;
+        case 'c': putc((char)va_arg(ap, int)); break;
+        case 's': {
+            const char* s = va_arg(ap, const char*);
+            if (!s) s = "(null)";
+            while (*s) putc(*s++);
+            break;
+        }
+        case '%': putc('%'); break;
+        case '\0': --fmt; break;           
+        default:  putc('%'); putc(*fmt); break;
+        }
+    }
+    va_end(ap);
 }
 
 void showChar(uint8_t* vram, int pitch, int x, int y, int scrnx, int scrny, char c, int color, int bg) {
