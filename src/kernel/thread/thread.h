@@ -47,6 +47,7 @@ struct task_struct {
 };
 
 extern struct task_struct* current_task;
+extern struct task_struct* idle_thread;
 
 void thread_init(void);
 void kernel_thread(char* name, uint8_t priority, thread_func function, void* arg);

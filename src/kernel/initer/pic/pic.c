@@ -24,8 +24,8 @@ int initPic(void) {
     uint8_t imr1 = inb(PIC1_DATA);
     uint8_t imr2 = inb(PIC2_DATA);
     if (imr1 == 0xFF && imr2 == 0xFF) {
-        outb(PIC1_DATA, 0xFC);
-        outb(PIC2_DATA, 0xFF);
+        outb(PIC1_DATA, 0xF8);
+        outb(PIC2_DATA, 0xBF);
         return 0;
     }
     return -1;

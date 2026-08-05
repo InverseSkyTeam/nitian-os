@@ -9,5 +9,6 @@
 #define PIT_HZ     100
 
 void initPIT(uint32_t hz);
+void mtime_sleep(uint32_t m_seconds);
 
 #endif

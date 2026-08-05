@@ -12,6 +12,14 @@ static uint32_t g_task_count = 0;
 static uint32_t g_pid_alloc = 0;
 
 struct task_struct* current_task;
+struct task_struct* idle_thread;
+
+static void idle(void* arg) {
+    for (;;) {
+        thread_block();
+        __asm__ volatile("sti; hlt" : : : "memory");
+    }
+}
 
 static void kernel_thread_entry(thread_func function, void* arg) {
     function(arg);
@@ -66,6 +74,8 @@ void thread_init(void) {
     g_task_table[0].pgdir = 0;
     g_task_table[0].stack_magic = STACK_MAGIC;
     g_task_count = 1;
+
+    idle_thread = thread_create("idle", 10, idle, 0);
 }
 
 void kernel_thread(char* name, uint8_t priority, thread_func function, void* arg) {
@@ -111,7 +121,7 @@ void schedule(void) {
         current_task->ticks = current_task->priority;
     }
     if (list_empty(&g_ready_list)) {
-        return;
+        thread_unblock(idle_thread);
     }
     struct list_elem* e = list_pop_front(&g_ready_list);
     struct task_struct* next = list_entry(e, struct task_struct, general_tag);

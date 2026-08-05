@@ -14,6 +14,7 @@
 #include "./thread/sync.h"
 #include "./device/ioqueue.h"
 #include "./device/keyboard.h"
+#include "./device/ide.h"
 #include "./userprog/process.h"
 #include "./syscall/syscall.h"
 #include "./lib/user/syscall.h"
@@ -228,6 +229,9 @@ void KMain(void) {
     printf("main_pid:0x%x\n", getpid());
 
     asm_sti();
+    
+    ide_init();
+
     for (;;) {
         thread_yield();
         asm_hlt();

@@ -5,6 +5,7 @@
 #include "../pic/pic.h"
 #include "../pit/pit.h"
 #include "../../device/keyboard.h"
+#include "../../device/ide.h"
 #include "../../thread/thread.h"
 
 volatile uint32_t g_tick = 0;
@@ -92,5 +93,9 @@ void irq_handler(struct Registers* r) {
 
     if (irq == 1) {
         keyboard_handler();
+    }
+
+    if (irq == 14) {
+        intr_hd_handler((uint8_t)r->int_no);
     }
 }

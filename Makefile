@@ -91,6 +91,9 @@ $(BUILD_DIR)/ioqueue.o: $(SRC_DIR)/kernel/device/ioqueue.c $(KERNEL_HDRS) | $(BU
 $(BUILD_DIR)/keyboard.o: $(SRC_DIR)/kernel/device/keyboard.c $(KERNEL_HDRS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/ide.o: $(SRC_DIR)/kernel/device/ide.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/gdt.o: $(SRC_DIR)/kernel/initer/gdt/gdt.c $(KERNEL_HDRS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -129,6 +132,7 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 						 $(BUILD_DIR)/sync.o \
 						 $(BUILD_DIR)/ioqueue.o \
 						 $(BUILD_DIR)/keyboard.o \
+						 $(BUILD_DIR)/ide.o \
 						 $(BUILD_DIR)/gdt.o \
 						 $(BUILD_DIR)/tss.o \
 						 $(BUILD_DIR)/process.o \
@@ -157,6 +161,7 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 		  $(BUILD_DIR)/sync.o \
 		  $(BUILD_DIR)/ioqueue.o \
 		  $(BUILD_DIR)/keyboard.o \
+		  $(BUILD_DIR)/ide.o \
 		  $(BUILD_DIR)/gdt.o \
 		  $(BUILD_DIR)/tss.o \
 		  $(BUILD_DIR)/process.o \
@@ -179,14 +184,18 @@ $(BUILD_DIR)/floppy.img: $(FLOPPY_DEPS) | $(BUILD_DIR)
 	          $(BUILD_DIR)/kernel.bin \
 	          $@
 
+$(BUILD_DIR)/test_hd.img: $(SCRIPTS_DIR)/make_disk.py | $(BUILD_DIR)
+	$(PYTHON) $(SCRIPTS_DIR)/make_disk.py $@
+
 .PHONY: all floppy run clean
 
 all: floppy
 
 floppy: $(BUILD_DIR)/floppy.img
 
-run: floppy
-	qemu-system-i386 -m 4G -fda $(BUILD_DIR)/floppy.img -debugcon stdio
+run: floppy $(BUILD_DIR)/test_hd.img
+	qemu-system-i386 -m 4G -fda $(BUILD_DIR)/floppy.img \
+	                 -hda $(BUILD_DIR)/test_hd.img -debugcon stdio
 
 clean:
 	rm -rf $(BUILD_DIR)
