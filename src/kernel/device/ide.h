@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include "../lib/list/list.h"
 #include "../thread/sync.h"
+#include "../memory/bitmap/bitmap.h"
+#include "../fs/super_block.h"
 
 struct partition {
     uint32_t start_lba;        
@@ -12,6 +14,10 @@ struct partition {
     struct disk* my_disk;      
     struct list_elem part_tag; 
     char name[8];              
+    struct super_block* sb;         
+    struct bitmap block_bitmap;     
+    struct bitmap inode_bitmap;     
+    struct list open_inodes;        
 };
 
 struct disk {
@@ -32,8 +38,8 @@ struct ide_channel {
     struct disk devices[2];     
 };
 
-void ide_read(struct disk* hd, uint32_t lba, void* buf, uint8_t sec_cnt);
-void ide_write(struct disk* hd, uint32_t lba, void* buf, uint8_t sec_cnt);
+void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt);
+void ide_write(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt);
 void intr_hd_handler(uint8_t irq_no);
 void ide_init(void);
 

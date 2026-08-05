@@ -84,7 +84,6 @@ void irq_handler(struct Registers* r) {
         g_tick++;
         if (g_tick % PIT_HZ == 0) {
             setTextColor(10);
-            kprintf("tick: %d\n", (int)g_tick);
         }
         if (current_task != 0) {
             schedule();

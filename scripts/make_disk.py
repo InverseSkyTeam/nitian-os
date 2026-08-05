@@ -1,12 +1,3 @@
-
-"""生成带分区表的 80MB 测试硬盘镜像(供 QEMU -hda 挂载, 验证 ide.c 分区扫描)
-
-布局:
-  MBR (扇区0): 3 个主分区(0x66) + 1 个扩展分区(0x05)
-  EBR1 @ 100352: 逻辑分区 sda5 + 指向下一个 EBR
-  EBR2 @ 122880: 逻辑分区 sda6
-用法: python3 make_disk.py [输出路径] (默认 ./test_hd.img)
-"""
 import struct
 import sys
 

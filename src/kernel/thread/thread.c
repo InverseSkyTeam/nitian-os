@@ -33,6 +33,17 @@ static void kernel_thread_entry(thread_func function, void* arg) {
     }
 }
 
+static void init_fd_table(struct task_struct* t) {
+    t->fd_table[0] = 0;
+    t->fd_table[1] = 1;
+    t->fd_table[2] = 2;
+    uint32_t fd_idx = 3;
+    while (fd_idx < MAX_FILES_OPEN_PER_PROC) {
+        t->fd_table[fd_idx++] = (uint32_t)-1;
+    }
+    t->cwd_inode_nr = 0;
+}
+
 struct task_struct* thread_create(char* name, uint8_t priority, thread_func function, void* arg) {
     struct task_struct* t = &g_task_table[g_task_count++];
     uint32_t stack = (uint32_t)get_kernel_pages(THREAD_STACK_SIZE / PAGE_SIZE);
@@ -55,6 +66,7 @@ struct task_struct* thread_create(char* name, uint8_t priority, thread_func func
     t->elapsed_ticks = 0;
     t->kernel_stack_top = stack + THREAD_STACK_SIZE;
     t->pgdir = 0;
+    init_fd_table(t);
     t->stack_magic = STACK_MAGIC;
     list_append(&g_ready_list, &t->general_tag);
     return t;
@@ -72,6 +84,7 @@ void thread_init(void) {
     g_task_table[0].elapsed_ticks = 0;
     g_task_table[0].kernel_stack_top = 0;
     g_task_table[0].pgdir = 0;
+    init_fd_table(&g_task_table[0]);
     g_task_table[0].stack_magic = STACK_MAGIC;
     g_task_count = 1;
 

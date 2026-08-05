@@ -18,6 +18,7 @@ KERNEL_HDRS := $(wildcard $(SRC_DIR)/kernel/include/*.h \
                          $(SRC_DIR)/kernel/memory/*/*.h \
                          $(SRC_DIR)/kernel/thread/*.h \
                          $(SRC_DIR)/kernel/device/*.h \
+                         $(SRC_DIR)/kernel/fs/*.h \
                          $(SRC_DIR)/kernel/userprog/*.h \
                          $(SRC_DIR)/kernel/syscall/*.h \
                          $(SRC_DIR)/kernel/initer/*/*.h)
@@ -94,6 +95,18 @@ $(BUILD_DIR)/keyboard.o: $(SRC_DIR)/kernel/device/keyboard.c $(KERNEL_HDRS) | $(
 $(BUILD_DIR)/ide.o: $(SRC_DIR)/kernel/device/ide.c $(KERNEL_HDRS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/fs.o: $(SRC_DIR)/kernel/fs/fs.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/inode.o: $(SRC_DIR)/kernel/fs/inode.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/dir.o: $(SRC_DIR)/kernel/fs/dir.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/file.o: $(SRC_DIR)/kernel/fs/file.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/gdt.o: $(SRC_DIR)/kernel/initer/gdt/gdt.c $(KERNEL_HDRS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -133,6 +146,10 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 						 $(BUILD_DIR)/ioqueue.o \
 						 $(BUILD_DIR)/keyboard.o \
 						 $(BUILD_DIR)/ide.o \
+						 $(BUILD_DIR)/fs.o \
+						 $(BUILD_DIR)/inode.o \
+						 $(BUILD_DIR)/dir.o \
+						 $(BUILD_DIR)/file.o \
 						 $(BUILD_DIR)/gdt.o \
 						 $(BUILD_DIR)/tss.o \
 						 $(BUILD_DIR)/process.o \
@@ -162,6 +179,10 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 		  $(BUILD_DIR)/ioqueue.o \
 		  $(BUILD_DIR)/keyboard.o \
 		  $(BUILD_DIR)/ide.o \
+		  $(BUILD_DIR)/fs.o \
+		  $(BUILD_DIR)/inode.o \
+		  $(BUILD_DIR)/dir.o \
+		  $(BUILD_DIR)/file.o \
 		  $(BUILD_DIR)/gdt.o \
 		  $(BUILD_DIR)/tss.o \
 		  $(BUILD_DIR)/process.o \
@@ -194,7 +215,7 @@ all: floppy
 floppy: $(BUILD_DIR)/floppy.img
 
 run: floppy $(BUILD_DIR)/test_hd.img
-	qemu-system-i386 -m 4G -fda $(BUILD_DIR)/floppy.img \
+	qemu-system-i386 -accel tcg,tb-size=256 -m 1G -fda $(BUILD_DIR)/floppy.img \
 	                 -hda $(BUILD_DIR)/test_hd.img -debugcon stdio
 
 clean:

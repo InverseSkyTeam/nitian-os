@@ -9,6 +9,7 @@
 #define THREAD_STACK_SIZE 0x2000
 #define MAX_TASKS 64
 #define STACK_MAGIC 0x19860726
+#define MAX_FILES_OPEN_PER_PROC 8
 
 enum task_status {
     TASK_RUNNING,
@@ -43,6 +44,8 @@ struct task_struct {
     uint32_t kernel_stack_top;
     uint32_t pgdir;
     struct virtual_addr userprog_v_addr;
+    uint32_t cwd_inode_nr;
+    uint32_t fd_table[MAX_FILES_OPEN_PER_PROC];
     uint32_t stack_magic;
 };
 

@@ -90,7 +90,13 @@ static void select_sector(struct disk* hd, uint32_t lba, uint8_t sec_cnt) {
     outb(reg_dev(channel), BIT_DEV_MBS | BIT_DEV_LBA | (hd->dev_no == 1 ? BIT_DEV_DEV : 0) | (uint8_t)(lba >> 24));
 }
 
+static void wait_bsy_clear(struct ide_channel* channel) {
+    while (inb(reg_status(channel)) & BIT_ALT_STAT_BSY) {
+    }
+}
+
 static void cmd_out(struct ide_channel* channel, uint8_t cmd) {
+    wait_bsy_clear(channel);
     channel->expecting_intr = 1;
     outb(reg_cmd(channel), cmd);
 }
@@ -117,75 +123,60 @@ static void write_to_sector(struct disk* hd, void* buf, uint8_t sec_cnt) {
 
 static int busy_wait(struct disk* hd) {
     struct ide_channel* channel = hd->my_channel;
-    uint16_t time_limit = 30 * 1000;
-    while (time_limit >= 0) {
-        if (!(inb(reg_status(channel)) & BIT_ALT_STAT_BSY)) {
-            return (inb(reg_status(channel)) & BIT_ALT_STAT_DRQ) != 0;
+    uint32_t timeout = 30 * 1000 * 100;
+    while (timeout--) {
+        uint8_t st = inb(reg_status(channel));
+        if (!(st & BIT_ALT_STAT_BSY)) {
+            return (st & BIT_ALT_STAT_DRQ) != 0;
         }
-        mtime_sleep(10);
-        time_limit -= 10;
     }
     return 0;
 }
 
-void ide_read(struct disk* hd, uint32_t lba, void* buf, uint8_t sec_cnt) {
+void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {
     ASSERT(lba <= MAX_LBA);
     ASSERT(sec_cnt > 0);
     lock_acquire(&hd->my_channel->lock);
 
     select_disk(hd);
 
-    uint32_t secs_op = 0;
     uint32_t secs_done = 0;
     while (secs_done < sec_cnt) {
-        if (sec_cnt - secs_done >= 256) {
-            secs_op = 256;
-        } else {
-            secs_op = sec_cnt - secs_done;
-        }
-        select_sector(hd, lba + secs_done, (uint8_t)secs_op);
+        select_sector(hd, lba + secs_done, 1);
         cmd_out(hd->my_channel, CMD_READ_SECTOR);
-        
-        sema_down(&hd->my_channel->disk_done);
 
         if (!busy_wait(hd)) {
             char error[64];
-            sprintf(error, "%s read sector %d failed!!!!!!", hd->name, (int)lba);
+            sprintf(error, "%s read sector %d failed!!!!!!", hd->name, (int)(lba + secs_done));
             ide_panic(error);
         }
-        read_from_sector(hd, (void*)((uint32_t)buf + secs_done * 512), (uint8_t)secs_op);
+        read_from_sector(hd, (void*)((uint32_t)buf + secs_done * 512), 1);
 
-        secs_done += secs_op;
+        secs_done++;
     }
     lock_release(&hd->my_channel->lock);
 }
 
-void ide_write(struct disk* hd, uint32_t lba, void* buf, uint8_t sec_cnt) {
+void ide_write(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {
     ASSERT(lba <= MAX_LBA);
     ASSERT(sec_cnt > 0);
     lock_acquire(&hd->my_channel->lock);
 
     select_disk(hd);
 
-    uint32_t secs_op = 0;
     uint32_t secs_done = 0;
     while (secs_done < sec_cnt) {
-        if (sec_cnt - secs_done >= 256) {
-            secs_op = 256;
-        } else {
-            secs_op = sec_cnt - secs_done;
-        }
-        select_sector(hd, lba + secs_done, (uint8_t)secs_op);
+        select_sector(hd, lba + secs_done, 1);
         cmd_out(hd->my_channel, CMD_WRITE_SECTOR);
         if (!busy_wait(hd)) {
             char error[64];
-            sprintf(error, "%s write sector %d failed!!!!!!", hd->name, (int)lba);
+            sprintf(error, "%s write sector %d failed!!!!!!", hd->name, (int)(lba + secs_done));
             ide_panic(error);
         }
-        write_to_sector(hd, (void*)((uint32_t)buf + secs_done * 512), (uint8_t)secs_op);
-        sema_down(&hd->my_channel->disk_done);
+        write_to_sector(hd, (void*)((uint32_t)buf + secs_done * 512), 1);
+        wait_bsy_clear(hd->my_channel);
 
-        secs_done += secs_op;
+        secs_done++;
     }
     lock_release(&hd->my_channel->lock);
 }
@@ -195,12 +186,8 @@ void intr_hd_handler(uint8_t irq_no) {
     uint32_t no = irq_no - 0x2e;
     struct ide_channel* channel = &channels[no];
     ASSERT(channel->irq_no == irq_no);
-    if (channel->expecting_intr) {
-        channel->expecting_intr = 0;
-        sema_up(&channel->disk_done);
-        
-        inb(reg_status(channel));
-    }
+    channel->expecting_intr = 0;
+    inb(reg_status(channel));
 }
 
 static void swap_pairs_bytes(const char* dst, char* buf, uint32_t len) {
@@ -218,7 +205,6 @@ static void identify_disk(struct disk* hd) {
     char id_info[512];
     select_disk(hd);
     cmd_out(hd->my_channel, CMD_IDENTIFY);
-    sema_down(&hd->my_channel->disk_done);
 
     if (!busy_wait(hd)) {
         char error[64];

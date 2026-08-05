@@ -15,6 +15,8 @@
 #include "./device/ioqueue.h"
 #include "./device/keyboard.h"
 #include "./device/ide.h"
+#include "./fs/fs.h"
+#include "./fs/dir.h"
 #include "./userprog/process.h"
 #include "./syscall/syscall.h"
 #include "./lib/user/syscall.h"
@@ -47,10 +49,6 @@ static void demo_producer(void* arg) {
         ioq_putchar(&demo_ioq, c);
         g_produced++;
         asm_restore_eflags(old);
-        if (g_produced % 25 == 0) {
-            setTextColor(13);
-            printf("[P] produced %d chars\n", (int)g_produced);
-        }
         thread_yield();
     }
     setTextColor(13);
@@ -68,10 +66,6 @@ static void demo_consumer(void* arg) {
         char c = ioq_getchar(&demo_ioq);
         g_consumed++;
         asm_restore_eflags(old);
-        if (g_consumed % 25 == 0) {
-            setTextColor(11);
-            printf("[C] consumed %d chars (last='%c')\n", (int)g_consumed, c);
-        }
         thread_yield();
     }
     setTextColor(11);
@@ -102,37 +96,24 @@ static void kbd_consumer(void* arg) {
     }
 }
 
-static int test_var_a = 0;
-static int test_var_b = 0;
-
 static void u_prog_a(void) {
     for (;;) {
-        printf("%s%d%c", " program_a_pid:", getpid(), '\n');
     }
 }
 
 static void u_prog_b(void) {
     for (;;) {
-        printf("%s%d%c", " program_b_pid:", getpid(), '\n');
     }
 }
 
 static void k_thread_a(void* arg) {
     for (;;) {
-        if (g_tick % PIT_HZ == 0) {
-            setTextColor(11);
-            printf("thread_a_pid:0x%x user_var_a=%d\n", getpid(), test_var_a);
-        }
         thread_yield();
     }
 }
 
 static void k_thread_b(void* arg) {
     for (;;) {
-        if (g_tick % PIT_HZ == 0) {
-            setTextColor(9);
-            printf("thread_b_pid:0x%x user_var_b=%d\n", getpid(), test_var_b);
-        }
         thread_yield();
     }
 }
@@ -231,6 +212,128 @@ void KMain(void) {
     asm_sti();
     
     ide_init();
+    filesys_init();
+
+    const char* test_path = "/hello.txt";
+    int fd = open_file(test_path, O_CREAT | O_RDWR);
+    if (fd == -1) {
+        setTextColor(12);
+        printf("[FS] open/create %s failed\n", test_path);
+    } else {
+        const char* msg = "hello file system";
+        uint32_t w = write_file(fd, msg, strlen(msg));
+        close_file(fd);
+        fd = open_file(test_path, O_RDONLY);
+        setTextColor(14);
+        printf("[FS] reopen fd=%d\n", fd);
+        char rbuf[64];
+        memset(rbuf, 0, sizeof(rbuf));
+        uint32_t r = read_file(fd, rbuf, sizeof(rbuf) - 1);
+        close_file(fd);
+        setTextColor(10);
+        printf("[FS] %s wrote=%d read=%d content=%s\n", test_path, (int)w, (int)r, rbuf);
+        if (w == strlen(msg) && r == strlen(msg) && strcmp(rbuf, msg) == 0) {
+            setTextColor(10);
+            printf("[OK] file lookup & rw via fd works\n");
+        } else {
+            setTextColor(12);
+            printf("[FAIL] file rw mismatch\n");
+        }
+
+        fd = open_file(test_path, O_RDONLY);
+        if (fd != -1) {
+            if (sys_lseek(fd, 0, SEEK_SET) == 0) {
+                char lbuf[64];
+                memset(lbuf, 0, sizeof(lbuf));
+                uint32_t lr = read_file(fd, lbuf, sizeof(lbuf) - 1);
+                close_file(fd);
+                setTextColor(10);
+                printf("[OK] lseek SEEK_SET 0 + read %d bytes\n", (int)lr);
+            } else {
+                close_file(fd);
+                setTextColor(12);
+                printf("[FAIL] lseek failed\n");
+            }
+        }
+
+        if (sys_unlink(test_path) == 0) {
+            setTextColor(10);
+            printf("[OK] unlink %s done\n", test_path);
+            int fd2 = open_file(test_path, O_RDONLY);
+            if (fd2 == -1) {
+                setTextColor(10);
+                printf("[OK] unlink verified: reopen fails\n");
+            } else {
+                close_file(fd2);
+                setTextColor(12);
+                printf("[FAIL] unlink not effective\n");
+            }
+        } else {
+            setTextColor(12);
+            printf("[FAIL] unlink %s failed\n", test_path);
+        }
+    }
+
+    setTextColor(14);
+    printf("[FS] ---- directory tests ----\n");
+    if (sys_mkdir("/dir1") == 0) {
+        setTextColor(10);
+        printf("[OK] mkdir /dir1\n");
+    }
+    if (sys_mkdir("/dir1/subdir1") == 0) {
+        setTextColor(10);
+        printf("[OK] mkdir /dir1/subdir1\n");
+    }
+    int dfd = open_file("/dir1/subdir1/file2", O_CREAT | O_RDWR);
+    if (dfd != -1) {
+        write_file(dfd, "Catch me!", 9);
+        close_file(dfd);
+        setTextColor(10);
+        printf("[OK] create /dir1/subdir1/file2\n");
+    }
+    struct stat st;
+    if (sys_stat("/dir1/subdir1/file2", &st) == 0) {
+        setTextColor(10);
+        printf("[OK] stat file2: ino=%d size=%d type=%d\n",
+               (int)st.st_ino, (int)st.st_size, (int)st.st_filetype);
+    }
+    struct dir* p_dir = sys_opendir("/dir1/subdir1");
+    if (p_dir) {
+        setTextColor(14);
+        printf("[FS] /dir1/subdir1 content:\n");
+        struct dir_entry* de;
+        while ((de = sys_readdir(p_dir))) {
+            setTextColor(11);
+            printf("    %s %s\n", de->f_type == FT_REGULAR ? "regular" : "directory", de->filename);
+        }
+        sys_closedir(p_dir);
+        setTextColor(10);
+        printf("[OK] opendir/readdir done\n");
+    }
+    if (sys_chdir("/dir1") == 0) {
+        char cwd[64];
+        memset(cwd, 0, sizeof(cwd));
+        sys_getcwd(cwd, sizeof(cwd));
+        setTextColor(10);
+        printf("[OK] chdir + getcwd = %s\n", cwd);
+        sys_chdir("/");
+    }
+    if (sys_rmdir("/dir1/subdir1") == -1) {
+        setTextColor(10);
+        printf("[OK] rmdir nonempty rejected\n");
+    }
+    if (sys_unlink("/dir1/subdir1/file2") == 0) {
+        setTextColor(10);
+        printf("[OK] unlink file2\n");
+    }
+    if (sys_rmdir("/dir1/subdir1") == 0) {
+        setTextColor(10);
+        printf("[OK] rmdir /dir1/subdir1\n");
+    }
+    if (sys_rmdir("/dir1") == 0) {
+        setTextColor(10);
+        printf("[OK] rmdir /dir1\n");
+    }
 
     for (;;) {
         thread_yield();
