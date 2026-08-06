@@ -40,11 +40,13 @@ static inline uint32_t syscall3(uint32_t nr, uint32_t arg1, uint32_t arg2, uint3
 }
 
 uint32_t getpid(void)                 { return syscall0(SYS_GETPID); }
-uint32_t write(char* str)             { return syscall1(SYS_WRITE, (uint32_t)str); }
+int32_t  write(int32_t fd, const void* buf, uint32_t count) {
+    return (int32_t)syscall3(SYS_WRITE, (uint32_t)fd, (uint32_t)buf, count);
+}
 int32_t  read(int32_t fd, void* buf, uint32_t count) {
     return (int32_t)syscall3(SYS_READ, (uint32_t)fd, (uint32_t)buf, count);
 }
-void     putchar(char c)              { syscall1(SYS_PUTCHAR, (uint32_t)(unsigned char)c); }
+void     putchar(char c)              { write(1, &c, 1); }
 void     clear(void)                  { syscall0(SYS_CLEAR); }
 int32_t  fork(void)                   { return (int32_t)syscall0(SYS_FORK); }
 int32_t  open(const char* pathname, uint8_t flag) {
@@ -69,3 +71,20 @@ struct dir_entry* readdir(struct dir* dir) {
 }
 void     rewinddir(struct dir* dir)   { syscall1(SYS_REWINDDIR, (uint32_t)dir); }
 void     ps(void)                     { syscall0(SYS_PS); }
+int32_t  execv(const char* path, const char* argv[]) {
+    return (int32_t)syscall2(SYS_EXECV, (uint32_t)path, (uint32_t)argv);
+}
+void exit(int32_t status) {
+    syscall1(SYS_EXIT, (uint32_t)status);
+    for (;;) {                                                 
+    }
+}
+int32_t wait(int32_t* status) {
+    return (int32_t)syscall1(SYS_WAIT, (uint32_t)status);
+}
+int32_t pipe(int32_t pipefd[2]) {
+    return (int32_t)syscall1(SYS_PIPE, (uint32_t)pipefd);
+}
+void fd_redirect(uint32_t old_local_fd, uint32_t new_local_fd) {
+    syscall2(SYS_FD_REDIRECT, (uint32_t)old_local_fd, (uint32_t)new_local_fd);
+}

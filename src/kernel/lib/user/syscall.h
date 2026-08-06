@@ -11,7 +11,7 @@ struct dir;
 struct dir_entry;
 
 uint32_t getpid(void);
-uint32_t write(char* str);
+int32_t  write(int32_t fd, const void* buf, uint32_t count);
 int32_t  read(int32_t fd, void* buf, uint32_t count);
 void     putchar(char c);
 void     clear(void);
@@ -30,5 +30,10 @@ int32_t  closedir(struct dir* dir);
 struct dir_entry* readdir(struct dir* dir);
 void     rewinddir(struct dir* dir);
 void     ps(void);
+int32_t  execv(const char* path, const char* argv[]);
+void     exit(int32_t status);
+int32_t  wait(int32_t* status);
+int32_t  pipe(int32_t pipefd[2]);
+void     fd_redirect(uint32_t old_local_fd, uint32_t new_local_fd);
 
 #endif

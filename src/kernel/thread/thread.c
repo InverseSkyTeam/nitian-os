@@ -4,6 +4,7 @@
 #include "../lib/list/list.h"
 #include "../memory/pool/pool.h"
 #include "../userprog/process.h"
+#include "../device/keyboard.h"
 #include "../include/asmFunc.h"
 #include "../include/assert.h"
 
@@ -15,6 +16,9 @@ struct list g_thread_all_list;
 
 struct task_struct* current_task;
 struct task_struct* idle_thread;
+
+uint32_t g_foreground_pid = (uint32_t)-1;
+uint32_t g_init_pid = 1;
 
 static void idle(void* arg) {
     for (;;) {
@@ -136,9 +140,10 @@ void thread_ready(struct task_struct* t) {
     if (t == NULL) return;
     uint32_t old = asm_save_eflags();
     asm_cli();
-    if (t->status != TASK_READY) {
-        list_append(&g_ready_list, &t->general_tag);
+
+    if (!elem_find(&g_ready_list, &t->general_tag)) {
         t->status = TASK_READY;
+        list_append(&g_ready_list, &t->general_tag);
     }
     asm_restore_eflags(old);
 }
@@ -155,10 +160,19 @@ void thread_block(void) {
     asm_restore_eflags(old);
 }
 
+void thread_block_with_status(enum task_status status) {
+    uint32_t old = asm_save_eflags();
+    asm_cli();
+    current_task->status = status;
+    schedule();
+    asm_restore_eflags(old);
+}
+
 void thread_unblock(struct task_struct* t) {
     uint32_t old = asm_save_eflags();
     asm_cli();
-    ASSERT(t->status == TASK_BLOCKED);
+    ASSERT(t->status == TASK_BLOCKED || t->status == TASK_WAITING ||
+           t->status == TASK_HANGING);
     if (t->status != TASK_READY) {
         ASSERT(!elem_find(&g_ready_list, &t->general_tag));
         list_push(&g_ready_list, &t->general_tag);
@@ -274,4 +288,93 @@ int thread_traverse_all(thread_all_action action, void* arg) {
         e = next;
     }
     return stopped;
+}
+
+void thread_exit_current(void) {
+    uint32_t old = asm_save_eflags();
+    asm_cli();
+    current_task->status = TASK_DIED;
+    if (elem_find(&g_ready_list, &current_task->general_tag)) {
+        list_remove(&current_task->general_tag);
+    }
+    schedule();
+    asm_restore_eflags(old);
+}
+
+void thread_kill_pid(uint32_t pid) {
+    struct task_struct* t = NULL;
+    for (uint32_t i = 0; i < g_task_count; i++) {
+        if (g_task_table[i].pid == pid) {
+            t = &g_task_table[i];
+            break;
+        }
+    }
+    if (t == NULL || t->status == TASK_DIED || t->status == TASK_HANGING) return;
+    if (t->pgdir == 0) return;                              
+
+    uint32_t old = asm_save_eflags();
+    asm_cli();
+    t->exit_status = -1;                                     
+    t->status = TASK_HANGING;                                    
+
+    if (elem_find(&g_ready_list, &t->general_tag)) {
+        list_remove(&t->general_tag);
+    }
+
+    for (uint32_t i = 0; i < g_task_count; i++) {
+        if (g_task_table[i].parent_pid == (int32_t)t->pid) {
+            g_task_table[i].parent_pid = (int32_t)g_init_pid;
+        }
+    }
+
+    if (keyboard_ioq.consumer == t) keyboard_ioq.consumer = 0;
+    if (keyboard_ioq.producer == t) keyboard_ioq.producer = 0;
+
+    struct task_struct* parent = pid2thread(t->parent_pid);
+    if (parent && parent->status == TASK_WAITING) {
+        thread_unblock(parent);
+    }
+    if (t == current_task) {
+        schedule();                                              
+    }
+    asm_restore_eflags(old);
+}
+
+int thread_is_died(uint32_t pid) {
+    for (uint32_t i = 0; i < g_task_count; i++) {
+        if (g_task_table[i].pid == pid) {
+            return (g_task_table[i].status == TASK_DIED ||
+                    g_task_table[i].status == TASK_HANGING);
+        }
+    }
+    return 1;                                          
+}
+
+struct task_struct* pid2thread(int32_t pid) {
+    for (uint32_t i = 0; i < g_task_count; i++) {
+        if ((int32_t)g_task_table[i].pid == pid) {
+            return &g_task_table[i];
+        }
+    }
+    return NULL;
+}
+
+void thread_exit(struct task_struct* thread_over, int need_schedule) {
+    uint32_t old = asm_save_eflags();
+    asm_cli();
+    thread_over->status = TASK_DIED;
+    if (elem_find(&g_ready_list, &thread_over->general_tag)) {
+        list_remove(&thread_over->general_tag);
+    }
+    if (thread_over->pgdir) {
+        pfree(&kernel_pool, thread_over->pgdir);
+        thread_over->pgdir = 0;
+    }
+    if (elem_find(&g_thread_all_list, &thread_over->all_list_tag)) {
+        list_remove(&thread_over->all_list_tag);
+    }
+    asm_restore_eflags(old);
+    if (need_schedule) {
+        schedule();
+    }
 }

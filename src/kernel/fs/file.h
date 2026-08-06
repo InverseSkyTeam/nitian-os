@@ -18,6 +18,7 @@ extern struct file file_table[MAX_FILE_OPEN];
 
 int fd_install(int32_t global_fd_idx);
 int fd_release(uint32_t local_fd);
+uint32_t fd_local2global(uint32_t local_fd);
 uint32_t file_read(struct file* file, void* buf, uint32_t count);
 uint32_t file_write(struct file* file, const void* buf, uint32_t count);
 

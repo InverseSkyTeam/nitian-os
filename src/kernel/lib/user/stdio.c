@@ -27,18 +27,18 @@ uint32_t vsprintf(char* str, const char* format, va_list ap) {
             fmt++;
             continue;
         }
-        
+
         fmt++;
         ch = *fmt;
         switch (ch) {
         case 'x': {
-            
+
             uint32_t v = (uint32_t)va_arg(ap, int);
             itoa(v, &buf_ptr, 16);
             break;
         }
         case 'd': {
-            
+
             int32_t v = va_arg(ap, int);
             if (v < 0) {
                 *buf_ptr++ = '-';
@@ -80,9 +80,9 @@ void printf(const char* format, ...) {
     va_list ap;
     va_start(ap, format);
     char buf[1024] = {0};
-    vsprintf(buf, format, ap);
+    uint32_t len = vsprintf(buf, format, ap);
     va_end(ap);
-    write(buf);
+    write(1, buf, len);
 }
 
 uint32_t sprintf(char* buf, const char* format, ...) {

@@ -11,10 +11,14 @@
 #define STACK_MAGIC 0x19860726
 #define MAX_FILES_OPEN_PER_PROC 8
 
+typedef int32_t pid_t;
+
 enum task_status {
     TASK_RUNNING,
     TASK_READY,
     TASK_BLOCKED,
+    TASK_WAITING,
+    TASK_HANGING,
     TASK_DIED
 };
 
@@ -43,6 +47,7 @@ struct task_struct {
     struct list_elem general_tag;
     struct list_elem all_list_tag;
     int32_t parent_pid;              
+    int8_t exit_status;                                       
     uint32_t kernel_stack_top;
     uint32_t pgdir;
     struct virtual_addr userprog_v_addr;
@@ -53,7 +58,11 @@ struct task_struct {
 
 extern struct task_struct* current_task;
 extern struct task_struct* idle_thread;
-extern struct list g_thread_all_list;   
+extern struct list g_thread_all_list;
+
+extern uint32_t g_foreground_pid;
+
+extern uint32_t g_init_pid;   
 
 void thread_init(void);
 void kernel_thread(char* name, uint8_t priority, thread_func function, void* arg);
@@ -64,12 +73,24 @@ void thread_block(void);
 void thread_unblock(struct task_struct* t);
 void thread_yield(void);
 
+void thread_block_with_status(enum task_status status);
+
+struct task_struct* pid2thread(int32_t pid);
+
+void thread_exit(struct task_struct* thread_over, int need_schedule);
+
 typedef int (*thread_all_action)(struct task_struct*, void*);
 int thread_traverse_all(thread_all_action action, void* arg);
 
 struct task_struct* thread_alloc_slot(const char* name, uint8_t priority);
 
 void thread_ready(struct task_struct* t);
+
+void thread_exit_current(void);
+
+void thread_kill_pid(uint32_t pid);
+
+int thread_is_died(uint32_t pid);
 
 typedef void (*fork_continuation)(void* arg, uint32_t child_pid, int is_child);
 int thread_fork_with_cb(const char* name, uint8_t priority,

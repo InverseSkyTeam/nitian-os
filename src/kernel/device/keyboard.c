@@ -1,6 +1,7 @@
 // 参考: 《操作系统真相还原》(于渊) 第11章 输入输出系统
 #include "./keyboard.h"
 #include "../include/asmFunc.h"
+#include "../thread/thread.h"
 
 #define KEYBOARD_DATA 0x60
 
@@ -11,6 +12,7 @@
 #define SC_CAPS_DOWN    0x3A
 #define SC_CTRL_L_DOWN  0x1D
 #define SC_CTRL_L_UP    0x9D
+#define SC_C_DOWN       0x2E                            
 
 #define KBD_CHAR_CTRL_U (1)    
 #define KBD_CHAR_CTRL_L (12)    
@@ -72,6 +74,11 @@ void keyboard_handler(void) {
     if (sc == SC_CTRL_L_UP)   { g_ctrl = 0; return; }
     if (sc & 0x80) { return; }
     if (sc >= 128) { return; }
+
+    if (g_ctrl && sc == SC_C_DOWN) {
+        thread_kill_pid(g_foreground_pid);
+        return;
+    }
 
     if (g_ctrl && sc < 0x3b) {
         char c = 0;

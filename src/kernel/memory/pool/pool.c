@@ -2,6 +2,7 @@
 #include "./pool.h"
 #include "../../lib/str/str.h"
 #include "../../thread/thread.h"
+#include "../../include/asmFunc.h"
 #include "../../include/assert.h"
 
 #define PDE_INDEX(addr) ((addr & 0xffc00000) >> 22)
@@ -106,10 +107,22 @@ void page_table_add(uint32_t vaddr, uint32_t phy_addr) {
     uint32_t* pde = pde_ptr(vaddr);
     uint32_t* pte = pte_ptr(vaddr);
 
-    if (*pde & 1) {
-        ASSERT(!(*pte & 1));
-        *pte = phy_addr | 7;
-    } else {
+        if (*pde & 1) {
+
+            if (*pde & 0x80) {
+                uint32_t pde_base = vaddr & 0xffc00000;
+                uint32_t pde_phy = (uint32_t)palloc(&kernel_pool);
+                uint32_t* table = (uint32_t*)pde_phy;
+                for (uint32_t i = 0; i < 1024; i++) {
+                    table[i] = (pde_base + i * PAGE_SIZE) | 7;
+                }
+                *pde = pde_phy | 7;
+                *pte = phy_addr | 7;                       
+                return;
+            }
+            ASSERT(!(*pte & 1));
+            *pte = phy_addr | 7;
+        } else {
         uint32_t pde_phy = (uint32_t)palloc(&kernel_pool);
         *pde = pde_phy | 7;
         memset((void*)((uint32_t)pte & 0xfffff000), 0, PAGE_SIZE);
@@ -145,4 +158,17 @@ void* get_kernel_pages(uint32_t pg_cnt) {
         memset((void*)(vaddr + i * PAGE_SIZE), 0, PAGE_SIZE);
     }
     return (void*)vaddr;
+}
+
+void free_kernel_page(uint32_t vaddr) {
+    uint32_t old_cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(old_cr3));
+    asm_write_cr3(0x400000);
+    uint32_t* pte = pte_ptr(vaddr);
+    if (*pte & 1) {
+        uint32_t phy = *pte & 0xfffff000;
+        *pte = 0;
+        pfree(&kernel_pool, phy);
+    }
+    asm_write_cr3(old_cr3);
 }

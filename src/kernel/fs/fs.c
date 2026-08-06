@@ -4,6 +4,7 @@
 #include "inode.h"
 #include "dir.h"
 #include "file.h"
+#include "../shell/pipe.h"
 #include "../device/ide.h"
 #include "../thread/thread.h"
 #include "../memory/pool/pool.h"
@@ -12,6 +13,21 @@
 #include "../include/assert.h"
 
 #define DIV_ROUND_UP(X, STEP) ((X + STEP - 1) / STEP)
+
+enum bitmap_type {
+    INODE_BITMAP,
+    BLOCK_BITMAP
+};
+
+static void bitmap_sync(struct partition* part, uint32_t bit_idx, uint8_t btmp_type) {
+    uint32_t off_sec = bit_idx / BITS_PER_SECTOR;
+    uint32_t sec_lba = (btmp_type == INODE_BITMAP)
+                       ? part->sb->inode_bitmap_lba + off_sec
+                       : part->sb->block_bitmap_lba + off_sec;
+    ide_write(part->my_disk, sec_lba,
+              ((btmp_type == INODE_BITMAP) ? part->inode_bitmap.bits : part->block_bitmap.bits) + off_sec * BLOCK_SIZE,
+              1);
+}
 
 struct partition* cur_part;
 
@@ -46,20 +62,9 @@ static void partition_format(struct partition* part) {
     sb.root_inode_no = 0;
     sb.dir_entry_size = sizeof(struct dir_entry);
 
-    kprintf("%s info:\n", part->name);
-    kprintf("   magic:0x%x part_lba_base:0x%x all_sectors:0x%x inode_cnt:0x%x\n",
-            (unsigned)sb.magic, (unsigned)sb.part_lba_base, (unsigned)sb.sec_cnt, (unsigned)sb.inode_cnt);
-    kprintf("   block_bitmap_lba:0x%x sects:0x%x\n",
-            (unsigned)sb.block_bitmap_lba, (unsigned)sb.block_bitmap_sects);
-    kprintf("   inode_bitmap_lba:0x%x sects:0x%x\n",
-            (unsigned)sb.inode_bitmap_lba, (unsigned)sb.inode_bitmap_sects);
-    kprintf("   inode_table_lba:0x%x sects:0x%x\n",
-            (unsigned)sb.inode_table_lba, (unsigned)sb.inode_table_sects);
-    kprintf("   data_start_lba:0x%x\n", (unsigned)sb.data_start_lba);
-
     struct disk* hd = part->my_disk;
     ide_write(hd, part->start_lba + 1, &sb, 1);
-    kprintf("   super_block_lba:0x%x\n", (unsigned)(part->start_lba + 1));
+
     uint32_t buf_size = (sb.block_bitmap_sects >= sb.inode_bitmap_sects ? sb.block_bitmap_sects : sb.inode_bitmap_sects);
     buf_size = (buf_size >= sb.inode_table_sects ? buf_size : sb.inode_table_sects) * SECTOR_SIZE;
     uint8_t* buf = (uint8_t*)get_kernel_pages(DIV_ROUND_UP(buf_size, PAGE_SIZE));
@@ -98,7 +103,6 @@ static void partition_format(struct partition* part) {
     p_de->f_type = FT_DIRECTORY;
     ide_write(hd, sb.data_start_lba, buf, 1);
 
-    kprintf("   root_dir_lba:0x%x\n", (unsigned)sb.data_start_lba);
     kprintf("%s format done\n", part->name);
 }
 
@@ -125,7 +129,6 @@ static void mount_partition(struct partition* part) {
 }
 
 void filesys_init(void) {
-    kprintf("searching filesystem......\n");
     struct super_block* sb_buf = (struct super_block*)get_kernel_pages(1);
 
     struct list_elem* e = partition_list.head.next;
@@ -133,9 +136,7 @@ void filesys_init(void) {
         struct partition* part = list_entry(e, struct partition, part_tag);
         memset(sb_buf, 0, SECTOR_SIZE);
         ide_read(part->my_disk, part->start_lba + 1, sb_buf, 1);
-        if (sb_buf->magic == FS_MAGIC) {
-            kprintf("%s has filesystem\n", part->name);
-        } else {
+        if (sb_buf->magic != FS_MAGIC) {
             kprintf("formatting %s partition %s.....\n", part->my_disk->name, part->name);
             partition_format(part);
         }
@@ -160,12 +161,14 @@ int32_t block_bitmap_alloc(struct partition* part) {
         return -1;
     }
     bitmap_set(&part->block_bitmap, (uint32_t)bit_idx, 1);
+    bitmap_sync(part, (uint32_t)bit_idx, BLOCK_BITMAP);
     return (int32_t)(part->sb->data_start_lba + (uint32_t)bit_idx);
 }
 
 void block_bitmap_free(struct partition* part, uint32_t lba) {
     uint32_t bit_idx = lba - part->sb->data_start_lba;
     bitmap_set(&part->block_bitmap, bit_idx, 0);
+    bitmap_sync(part, bit_idx, BLOCK_BITMAP);
 }
 
 int32_t inode_bitmap_alloc(struct partition* part) {
@@ -174,11 +177,13 @@ int32_t inode_bitmap_alloc(struct partition* part) {
         return -1;
     }
     bitmap_set(&part->inode_bitmap, (uint32_t)bit_idx, 1);
+    bitmap_sync(part, (uint32_t)bit_idx, INODE_BITMAP);
     return bit_idx;
 }
 
 void inode_bitmap_free(struct partition* part, uint32_t inode_no) {
     bitmap_set(&part->inode_bitmap, inode_no, 0);
+    bitmap_sync(part, inode_no, INODE_BITMAP);
 }
 
 char* path_parse(char* pathname, char* name_store) {
@@ -483,6 +488,15 @@ int close_file(int fd) {
         return -1;
     }
     struct file* file = &file_table[global_fd_idx];
+    if (file->fd_flag == PIPE_FLAG) {
+
+        if (--file->fd_pos == 0) {
+            free_kernel_page((uint32_t)file->fd_inode);
+            file->fd_inode = NULL;
+        }
+        fd_release((uint32_t)fd);
+        return 0;
+    }
     inode_close(file->fd_inode);
     file->fd_inode = NULL;
     file->fd_pos = 0;

@@ -24,6 +24,16 @@ int ioq_empty(struct ioqueue* ioq) {
     return ioq->head == ioq->tail;
 }
 
+uint32_t ioq_length(struct ioqueue* ioq) {
+    uint32_t len = 0;
+    if (ioq->head >= ioq->tail) {
+        len = (uint32_t)(ioq->head - ioq->tail);
+    } else {
+        len = (uint32_t)(BUFSIZE - (ioq->tail - ioq->head));
+    }
+    return len;
+}
+
 static void ioq_wait(struct task_struct** waiter) {
     *waiter = current_task;
     thread_block();

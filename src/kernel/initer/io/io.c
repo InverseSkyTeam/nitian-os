@@ -75,10 +75,11 @@ static void putc(char c) {
             scroll_screen();
         }
     } else {
+
         showChar(g_vram, g_pitch,
                  g_cursor_x, g_cursor_y,
                  g_scrnx, g_scrny,
-                 c, g_text_color, -1);
+                 c, g_text_color, 0);
         g_cursor_x += 8;
 
         if (g_cursor_x + 8 > g_scrnx) {

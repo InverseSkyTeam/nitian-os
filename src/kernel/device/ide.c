@@ -86,7 +86,7 @@ static void select_sector(struct disk* hd, uint32_t lba, uint8_t sec_cnt) {
     outb(reg_lba_l(channel), lba);
     outb(reg_lba_m(channel), lba >> 8);
     outb(reg_lba_h(channel), lba >> 16);
-    
+
     outb(reg_dev(channel), BIT_DEV_MBS | BIT_DEV_LBA | (hd->dev_no == 1 ? BIT_DEV_DEV : 0) | (uint8_t)(lba >> 24));
 }
 
@@ -278,7 +278,7 @@ static void print_partition_info(void) {
 
 void ide_init(void) {
     kprintf("ide_init start\n");
-    
+
     uint8_t hd_cnt = *((uint8_t*)(0x475));
     if (hd_cnt == 0) {
         kprintf("  no hard disk detected (0x475=0), skip ide_init\n");

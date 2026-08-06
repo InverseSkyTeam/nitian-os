@@ -1,3 +1,6 @@
+#ifndef ASM_STUB_H
+#define ASM_STUB_H
+
 #include <stdint.h>
 
 extern void isr0(void);
@@ -65,3 +68,5 @@ struct Registers {
 
 void isr_handler(struct Registers* r);
 void irq_handler(struct Registers* r);
+
+#endif

@@ -63,7 +63,11 @@ uint32_t* create_page_dir(void) {
         return 0;
     }
     memset(page_dir_vaddr, 0, PAGE_SIZE);
-    memcpy(page_dir_vaddr + 0, (void*)0x400000, 64 * 4);
+
+    for (int i = 0; i < 64; i++) {
+        page_dir_vaddr[i] = (uint32_t)(i * 0x400000) | 0x87;
+    }
+
     memcpy(page_dir_vaddr + 768, (void*)0x400C00, 256 * 4);
     page_dir_vaddr[1023] = (uint32_t)page_dir_vaddr | 7;
     return page_dir_vaddr;
@@ -78,7 +82,8 @@ void create_user_vaddr_bitmap(struct task_struct* user_prog) {
 }
 
 void process_execute(void* filename, char* name) {
-    struct task_struct* thread = thread_create(name, DEFAULT_PRIO, start_process, filename);
+
+    struct task_struct* thread = thread_alloc_slot(name, DEFAULT_PRIO);
 
     struct thread_stack* ts = (struct thread_stack*)(thread->kernel_stack_top - sizeof(struct thread_stack));
     ts->eip = (void (*)(void))start_process;
@@ -88,4 +93,6 @@ void process_execute(void* filename, char* name) {
 
     create_user_vaddr_bitmap(thread);
     thread->pgdir = (uint32_t)create_page_dir();
+
+    thread_ready(thread);
 }
