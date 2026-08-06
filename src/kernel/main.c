@@ -19,6 +19,7 @@
 #include "./fs/dir.h"
 #include "./userprog/process.h"
 #include "./syscall/syscall.h"
+#include "./shell/shell.h"
 #include "./lib/user/syscall.h"
 #include "./lib/user/stdio.h"
 
@@ -38,6 +39,7 @@ static volatile int g_consumed = 0;
 #define DEMO_TOTAL 100
 
 static void demo_producer(void* arg) {
+    (void)arg;
     for (;;) {
         uint32_t old = asm_save_eflags();
         asm_cli();
@@ -51,11 +53,10 @@ static void demo_producer(void* arg) {
         asm_restore_eflags(old);
         thread_yield();
     }
-    setTextColor(13);
-    printf("[P] producer done (%d chars)\n", (int)g_produced);
 }
 
 static void demo_consumer(void* arg) {
+    (void)arg;
     for (;;) {
         uint32_t old = asm_save_eflags();
         asm_cli();
@@ -66,32 +67,6 @@ static void demo_consumer(void* arg) {
         char c = ioq_getchar(&demo_ioq);
         g_consumed++;
         asm_restore_eflags(old);
-        thread_yield();
-    }
-    setTextColor(11);
-    printf("[C] consumer done (%d chars)\n", (int)g_consumed);
-}
-
-static void kbd_consumer(void* arg) {
-    char line[80];
-    int n = 0;
-    for (;;) {
-        uint32_t old = asm_save_eflags();
-        asm_cli();
-        char c = ioq_getchar(&keyboard_ioq);
-        asm_restore_eflags(old);
-        if (c == '\n' || c == '\r') {
-            line[n] = 0;
-            setTextColor(12);
-            printf("[KBD] line: %s\n", line);
-            n = 0;
-        } else if (c == 0x08) {
-            if (n > 0) {
-                n--;
-            }
-        } else if (n < (int)sizeof(line) - 1) {
-            line[n++] = c;
-        }
         thread_yield();
     }
 }
@@ -196,7 +171,6 @@ void KMain(void) {
 
     kernel_thread("producer", 3, demo_producer, 0);
     kernel_thread("consumer", 3, demo_consumer, 0);
-    kernel_thread("kbd",      4, kbd_consumer, 0);
 
     process_execute((void*)u_prog_a, "u_prog_a");
     process_execute((void*)u_prog_b, "u_prog_b");
@@ -204,7 +178,7 @@ void KMain(void) {
     kernel_thread("k_b", 4, k_thread_b, 0);
 
     setTextColor(10);
-    printf("[OK] user processes + demo threads started, type to see [KBD] lines\n");
+    printf("[OK] user processes + demo threads started (type to see [KBD] lines)\n");
 
     setTextColor(14);
     printf("main_pid:0x%x\n", getpid());
@@ -335,6 +309,7 @@ void KMain(void) {
         printf("[OK] rmdir /dir1\n");
     }
 
+    kernel_thread("shell", 5, my_shell, NULL);
     for (;;) {
         thread_yield();
         asm_hlt();

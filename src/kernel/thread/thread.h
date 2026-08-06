@@ -41,6 +41,8 @@ struct task_struct {
     uint8_t ticks;
     uint32_t elapsed_ticks;
     struct list_elem general_tag;
+    struct list_elem all_list_tag;
+    int32_t parent_pid;              
     uint32_t kernel_stack_top;
     uint32_t pgdir;
     struct virtual_addr userprog_v_addr;
@@ -51,6 +53,7 @@ struct task_struct {
 
 extern struct task_struct* current_task;
 extern struct task_struct* idle_thread;
+extern struct list g_thread_all_list;   
 
 void thread_init(void);
 void kernel_thread(char* name, uint8_t priority, thread_func function, void* arg);
@@ -60,5 +63,16 @@ void switch_to(uint32_t** cur_kstack, uint32_t** next_kstack);
 void thread_block(void);
 void thread_unblock(struct task_struct* t);
 void thread_yield(void);
+
+typedef int (*thread_all_action)(struct task_struct*, void*);
+int thread_traverse_all(thread_all_action action, void* arg);
+
+struct task_struct* thread_alloc_slot(const char* name, uint8_t priority);
+
+void thread_ready(struct task_struct* t);
+
+typedef void (*fork_continuation)(void* arg, uint32_t child_pid, int is_child);
+int thread_fork_with_cb(const char* name, uint8_t priority,
+                        fork_continuation cb, void* arg);
 
 #endif

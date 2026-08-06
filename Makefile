@@ -21,6 +21,7 @@ KERNEL_HDRS := $(wildcard $(SRC_DIR)/kernel/include/*.h \
                          $(SRC_DIR)/kernel/fs/*.h \
                          $(SRC_DIR)/kernel/userprog/*.h \
                          $(SRC_DIR)/kernel/syscall/*.h \
+                         $(SRC_DIR)/kernel/shell/*.h \
                          $(SRC_DIR)/kernel/initer/*/*.h)
 
 $(BUILD_DIR):
@@ -116,6 +117,12 @@ $(BUILD_DIR)/tss.o: $(SRC_DIR)/kernel/initer/tss/tss.c $(KERNEL_HDRS) | $(BUILD_
 $(BUILD_DIR)/process.o: $(SRC_DIR)/kernel/userprog/process.c $(KERNEL_HDRS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/shell.o: $(SRC_DIR)/kernel/shell/shell.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/buildin_cmd.o: $(SRC_DIR)/kernel/shell/buildin_cmd.c $(KERNEL_HDRS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/ksyscall.o: $(SRC_DIR)/kernel/syscall/syscall.c $(KERNEL_HDRS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -153,6 +160,8 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 						 $(BUILD_DIR)/gdt.o \
 						 $(BUILD_DIR)/tss.o \
 						 $(BUILD_DIR)/process.o \
+						 $(BUILD_DIR)/shell.o \
+						 $(BUILD_DIR)/buildin_cmd.o \
 						 $(BUILD_DIR)/ksyscall.o \
 						 $(BUILD_DIR)/usyscall.o \
 						 $(BUILD_DIR)/ustdio.o \
@@ -186,6 +195,8 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 		  $(BUILD_DIR)/gdt.o \
 		  $(BUILD_DIR)/tss.o \
 		  $(BUILD_DIR)/process.o \
+		  $(BUILD_DIR)/shell.o \
+		  $(BUILD_DIR)/buildin_cmd.o \
 		  $(BUILD_DIR)/ksyscall.o \
 		  $(BUILD_DIR)/usyscall.o \
 		  $(BUILD_DIR)/ustdio.o

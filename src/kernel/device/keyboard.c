@@ -9,6 +9,11 @@
 #define SC_SHIFT_L_UP   0xAA
 #define SC_SHIFT_R_UP   0xB6
 #define SC_CAPS_DOWN    0x3A
+#define SC_CTRL_L_DOWN  0x1D
+#define SC_CTRL_L_UP    0x9D
+
+#define KBD_CHAR_CTRL_U (1)    
+#define KBD_CHAR_CTRL_L (12)    
 
 struct ioqueue keyboard_ioq;
 
@@ -51,6 +56,7 @@ static const char keymap[2][128] = {
 
 static uint8_t g_shift = 0;
 static uint8_t g_caps = 0;
+static uint8_t g_ctrl = 0;
 
 void keyboard_init(void) {
     ioq_init(&keyboard_ioq);
@@ -59,29 +65,26 @@ void keyboard_init(void) {
 void keyboard_handler(void) {
     uint8_t sc = inb(KEYBOARD_DATA);
 
-    if (sc == SC_SHIFT_L_DOWN || sc == SC_SHIFT_R_DOWN) {
-        g_shift = 1;
-        return;
-    }
-    if (sc == SC_SHIFT_L_UP || sc == SC_SHIFT_R_UP) {
-        g_shift = 0;
-        return;
-    }
-    if (sc == SC_CAPS_DOWN) {
-        g_caps = !g_caps;
-        return;
-    }
-    if (sc & 0x80) {
-        return;
-    }
-    if (sc >= 128) {
-        return;
+    if (sc == SC_SHIFT_L_DOWN || sc == SC_SHIFT_R_DOWN) { g_shift = 1; return; }
+    if (sc == SC_SHIFT_L_UP   || sc == SC_SHIFT_R_UP)   { g_shift = 0; return; }
+    if (sc == SC_CAPS_DOWN) { g_caps = !g_caps; return; }
+    if (sc == SC_CTRL_L_DOWN) { g_ctrl = 1; return; }
+    if (sc == SC_CTRL_L_UP)   { g_ctrl = 0; return; }
+    if (sc & 0x80) { return; }
+    if (sc >= 128) { return; }
+
+    if (g_ctrl && sc < 0x3b) {
+        char c = 0;
+        if (sc == 0x16) c = (char)KBD_CHAR_CTRL_U;      
+        else if (sc == 0x26) c = (char)KBD_CHAR_CTRL_L;  
+        if (c) {
+            if (!ioq_full(&keyboard_ioq)) ioq_putchar(&keyboard_ioq, c);
+            return;
+        }
     }
 
     char c = keymap[g_shift ? 1 : 0][sc];
-    if (g_caps && c >= 'a' && c <= 'z') {
-        c -= 32;
-    }
+    if (g_caps && c >= 'a' && c <= 'z') c -= 32;
 
     if (c && !ioq_full(&keyboard_ioq)) {
         ioq_putchar(&keyboard_ioq, c);

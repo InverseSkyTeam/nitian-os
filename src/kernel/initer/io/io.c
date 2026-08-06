@@ -18,7 +18,7 @@ void initIO(uint8_t* vram, int scrnx, int scrny) {
     g_scrny     = scrny;
     g_pitch     = scrnx;
     g_cursor_x  = 0;
-    g_cursor_y  = -20;
+    g_cursor_y  = 0;
     g_text_color = 7;
 }
 
@@ -36,10 +36,44 @@ int getCursorY(void) { return g_cursor_y; }
 
 #define DEBUG_CONSOLE_PORT 0xE9
 
+static void vram_shift_up(int line_bytes) {
+    int total_bytes = g_scrny * g_pitch;
+    if ((g_pitch & 3) == 0 && ((uintptr_t)g_vram & 3) == 0) {
+        uint32_t* dw = (uint32_t*)g_vram;
+        int line_dw = line_bytes / 4;
+        int total_dw = total_bytes / 4;
+        for (int i = line_dw; i < total_dw; i++) dw[i - line_dw] = dw[i];
+        for (int i = total_dw - line_dw; i < total_dw; i++) dw[i] = 0;
+    } else {
+        for (int i = line_bytes; i < total_bytes; i++) g_vram[i - line_bytes] = g_vram[i];
+        for (int i = total_bytes - line_bytes; i < total_bytes; i++) g_vram[i] = 0;
+    }
+}
+
+static void vram_zero_all(void) {
+    int total_bytes = g_scrny * g_pitch;
+    if ((g_pitch & 3) == 0 && ((uintptr_t)g_vram & 3) == 0) {
+        uint32_t* dw = (uint32_t*)g_vram;
+        int total_dw = total_bytes / 4;
+        for (int i = 0; i < total_dw; i++) dw[i] = 0;
+    } else {
+        for (int i = 0; i < total_bytes; i++) g_vram[i] = 0;
+    }
+}
+
+static void scroll_screen(void) {
+    if (g_vram == 0 || g_scrnx <= 0 || g_scrny <= 0 || g_pitch <= 0) return;
+    vram_shift_up(PRINTF_LINE_GAP * g_pitch);
+    g_cursor_y -= PRINTF_LINE_GAP;
+}
+
 static void putc(char c) {
     if (c == '\n') {
         g_cursor_y += PRINTF_LINE_GAP;
         g_cursor_x = 0;
+        if (g_cursor_y + PRINTF_LINE_GAP > g_scrny) {
+            scroll_screen();
+        }
     } else {
         showChar(g_vram, g_pitch,
                  g_cursor_x, g_cursor_y,
@@ -50,6 +84,9 @@ static void putc(char c) {
         if (g_cursor_x + 8 > g_scrnx) {
             g_cursor_y += PRINTF_LINE_GAP;
             g_cursor_x = 0;
+            if (g_cursor_y + PRINTF_LINE_GAP > g_scrny) {
+                scroll_screen();
+            }
         }
     }
     outb(DEBUG_CONSOLE_PORT, (uint8_t)c);
@@ -163,6 +200,13 @@ void console_put_str(const char* s) {
     while (*s) {
         putc(*s++);
     }
+}
+
+void io_clear_screen(void) {
+    vram_zero_all();
+    g_cursor_x = 0;
+    g_cursor_y = 0;
+    g_text_color = 7;
 }
 
 void showChar(uint8_t* vram, int pitch, int x, int y, int scrnx, int scrny, char c, int color, int bg) {    const uint8_t* font = FONT_BASE + ((uint8_t)c) * 16;
