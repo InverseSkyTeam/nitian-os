@@ -27,6 +27,10 @@ extern const unsigned char _binary_fork_demo_elf_start[];
 extern const unsigned char _binary_fork_demo_elf_end[];
 extern const unsigned char _binary_prog_pipe_elf_start[];
 extern const unsigned char _binary_prog_pipe_elf_end[];
+extern const unsigned char _binary_font_demo_elf_start[];
+extern const unsigned char _binary_font_demo_elf_end[];
+extern const unsigned char _binary_font_subset_ttf_start[];
+extern const unsigned char _binary_font_subset_ttf_end[];
 
 struct BootInfo {
     uint8_t  cyls;
@@ -132,6 +136,8 @@ void KMain(void) {
     write_prog("/fork_demo", _binary_fork_demo_elf_start, _binary_fork_demo_elf_end);
     write_prog("/forktest", _binary_fork_demo_elf_start, _binary_fork_demo_elf_end);
     write_prog("/prog_pipe", _binary_prog_pipe_elf_start, _binary_prog_pipe_elf_end);
+    write_prog("/font_demo", _binary_font_demo_elf_start, _binary_font_demo_elf_end);
+    write_prog("/font.ttf", _binary_font_subset_ttf_start, _binary_font_subset_ttf_end);
     setTextColor(10);
     printf("[OK] user programs installed\n");
 

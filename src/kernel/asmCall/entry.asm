@@ -70,10 +70,7 @@ entry_start:
         mov     eax, [0x0FF8]
         shr     eax, 22
         mov     edx, 0x441000
-        ; U/S=1: framebuffer 需允许用户态直接写显存。
-        ; shell 是用户进程(ring3), 退格清格/清屏直接执行内核 console
-        ; 代码写 VRAM; 若 PDE 是 supervisor-only, 用户态写会触发
-        ; Page Fault err=0x7 (U/S 违规)。
+
         or      edx, 7
         mov     [0x400000 + eax*4], edx
         mov     eax, [0x0FF8]

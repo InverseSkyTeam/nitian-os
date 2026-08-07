@@ -13,7 +13,7 @@ PYTHON  = python3
 
 CFLAGS = -target x86-freestanding -ffreestanding -fno-builtin -fno-sanitize=all
 
-UP_CFLAGS = $(CFLAGS) -I $(SRC_DIR)/kernel/lib/user -I $(SRC_DIR)/kernel/lib/str
+UP_CFLAGS = $(CFLAGS) -I $(SRC_DIR)/kernel/lib/user -I $(SRC_DIR)/kernel/lib/str -I $(SRC_DIR)/kernel/lib
 UP_LDFLAGS = -s -m elf_i386 -Ttext 0x8048000 -e main
 
 KERNEL_HDRS := $(wildcard $(SRC_DIR)/kernel/include/*.h \
@@ -229,6 +229,31 @@ $(BUILD_DIR)/prog_pipe.elf: $(BUILD_DIR)/up_start.o \
 
 $(BUILD_DIR)/prog_pipe_data.o: $(BUILD_DIR)/prog_pipe.elf | $(BUILD_DIR)
 	cd $(BUILD_DIR) && $(OBJCOPY) -I binary -O elf32-i386 -B i386 prog_pipe.elf prog_pipe_data.o
+ 
+$(BUILD_DIR)/font_subset.ttf: $(SCRIPTS_DIR)/make_font_subset.py \
+                               $(SRC_DIR)/kernel/lib/assets/font.ttf | $(BUILD_DIR)
+	$(PYTHON) $(SCRIPTS_DIR)/make_font_subset.py \
+	          $(SRC_DIR)/kernel/lib/assets/font.ttf $@
+
+$(BUILD_DIR)/font_subset_ttf_data.o: $(BUILD_DIR)/font_subset.ttf | $(BUILD_DIR)
+	cd $(BUILD_DIR) && $(OBJCOPY) -I binary -O elf32-i386 -B i386 font_subset.ttf font_subset_ttf_data.o
+
+$(BUILD_DIR)/font_demo.elf: $(BUILD_DIR)/up_start.o \
+                            $(SRC_DIR)/command/font_demo.c \
+                            $(SRC_DIR)/command/start.asm \
+                            $(SRC_DIR)/kernel/lib/stb_truetype.h \
+                            $(SRC_DIR)/kernel/lib/user/stdio.c \
+                            $(SRC_DIR)/kernel/lib/user/syscall.c \
+                            $(SRC_DIR)/kernel/lib/str/str.c | $(BUILD_DIR)
+	$(CC) $(UP_CFLAGS) -Os -c $(SRC_DIR)/command/font_demo.c -o $(BUILD_DIR)/up_font.o
+	$(CC) $(UP_CFLAGS) -c $(SRC_DIR)/kernel/lib/user/stdio.c -o $(BUILD_DIR)/up_stdio.o
+	$(CC) $(UP_CFLAGS) -c $(SRC_DIR)/kernel/lib/user/syscall.c -o $(BUILD_DIR)/up_syscall.o
+	$(CC) $(UP_CFLAGS) -c $(SRC_DIR)/kernel/lib/str/str.c -o $(BUILD_DIR)/up_str.o
+	$(LD) -s -m elf_i386 -Ttext 0x8048000 -e _start -o $@ \
+	      $(BUILD_DIR)/up_start.o $(BUILD_DIR)/up_font.o $(BUILD_DIR)/up_stdio.o $(BUILD_DIR)/up_syscall.o $(BUILD_DIR)/up_str.o
+
+$(BUILD_DIR)/font_demo_data.o: $(BUILD_DIR)/font_demo.elf | $(BUILD_DIR)
+	cd $(BUILD_DIR) && $(OBJCOPY) -I binary -O elf32-i386 -B i386 font_demo.elf font_demo_data.o
 
 $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
                          $(BUILD_DIR)/kernel.o \
@@ -269,6 +294,8 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 						 $(BUILD_DIR)/cat_data.o \
 						 $(BUILD_DIR)/fork_demo_data.o \
 						 $(BUILD_DIR)/prog_pipe_data.o \
+						 $(BUILD_DIR)/font_demo_data.o \
+						 $(BUILD_DIR)/font_subset_ttf_data.o \
 						 $(BUILD_DIR)/wait_exit.o \
 						 $(BUILD_DIR)/fork.o \
 						 $(BUILD_DIR)/pipe.o \
@@ -313,6 +340,8 @@ $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/entry.o \
 		  $(BUILD_DIR)/cat_data.o \
 		  $(BUILD_DIR)/fork_demo_data.o \
 		  $(BUILD_DIR)/prog_pipe_data.o \
+		  $(BUILD_DIR)/font_demo_data.o \
+		  $(BUILD_DIR)/font_subset_ttf_data.o \
 		  $(BUILD_DIR)/wait_exit.o \
 		  $(BUILD_DIR)/fork.o \
 		  $(BUILD_DIR)/pipe.o
