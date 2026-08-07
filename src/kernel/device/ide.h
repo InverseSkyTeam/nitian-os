@@ -24,6 +24,7 @@ struct disk {
     char name[8];                    
     struct ide_channel* my_channel;  
     uint8_t dev_no;                  
+    uint32_t max_lba;                
     struct partition prim_parts[4];  
     struct partition logic_parts[8]; 
 };

@@ -130,6 +130,9 @@ static void mount_partition(struct partition* part) {
 
 void filesys_init(void) {
     struct super_block* sb_buf = (struct super_block*)get_kernel_pages(1);
+    if (sb_buf == NULL) {
+        return;
+    }
 
     struct list_elem* e = partition_list.head.next;
     while (e != &partition_list.tail) {
@@ -142,6 +145,7 @@ void filesys_init(void) {
         }
         e = e->next;
     }
+    free_kernel_page((uint32_t)sb_buf);
 
     struct list_elem* pe = partition_list.head.next;
     while (pe != &partition_list.tail) {
@@ -204,6 +208,9 @@ char* path_parse(char* pathname, char* name_store) {
 int search_dir_entry(struct partition* part, struct dir* pdir, const char* name, struct dir_entry* dir_e) {
     uint32_t block_cnt = 140;
     uint32_t* all_blocks = (uint32_t*)get_kernel_pages(1);
+    if (all_blocks == 0) {
+        return -1;
+    }
     memset(all_blocks, 0, PAGE_SIZE);
     uint32_t block_idx = 0;
     for (block_idx = 0; block_idx < 12; block_idx++) {
@@ -213,9 +220,14 @@ int search_dir_entry(struct partition* part, struct dir* pdir, const char* name,
         ide_read(part->my_disk, pdir->inode->i_sectors[12], all_blocks + 12, 1);
     }
     uint8_t* buf = (uint8_t*)get_kernel_pages(1);
+    if (buf == 0) {
+        free_kernel_page((uint32_t)all_blocks);
+        return -1;
+    }
     memset(buf, 0, PAGE_SIZE);
     uint32_t dir_entry_size = part->sb->dir_entry_size;
     uint32_t dir_entry_cnt = BLOCK_SIZE / dir_entry_size;
+    uint32_t found_inode_no = (uint32_t)-1;
     for (block_idx = 0; block_idx < block_cnt; block_idx++) {
         if (all_blocks[block_idx] == 0) {
             continue;
@@ -226,12 +238,18 @@ int search_dir_entry(struct partition* part, struct dir* pdir, const char* name,
         for (i = 0; i < dir_entry_cnt; i++) {
             if (strcmp(p_de->filename, name) == 0) {
                 memcpy(dir_e, p_de, dir_entry_size);
-                return (int)p_de->i_no;
+                found_inode_no = p_de->i_no;
+                break;
             }
             p_de++;
         }
+        if (found_inode_no != (uint32_t)-1) {
+            break;
+        }
     }
-    return -1;
+    free_kernel_page((uint32_t)all_blocks);
+    free_kernel_page((uint32_t)buf);
+    return (int)found_inode_no;
 }
 
 int create_dir_entry(struct partition* part, struct dir* pdir, uint32_t inode_no, const char* filename, enum file_types f_type) {
@@ -241,9 +259,12 @@ int create_dir_entry(struct partition* part, struct dir* pdir, uint32_t inode_no
     uint32_t dir_entry_size = part->sb->dir_entry_size;
     uint32_t dir_entry_cnt = BLOCK_SIZE / dir_entry_size;
     uint8_t* buf = (uint8_t*)get_kernel_pages(1);
+    if (buf == 0) {
+        return 0;
+    }
     memset(buf, 0, PAGE_SIZE);
     uint32_t block_lba = 0;
-    while (block_idx * BLOCK_SIZE < dir_size) {
+    while (block_idx * BLOCK_SIZE < dir_size && block_idx < 12) {
         block_lba = pdir->inode->i_sectors[block_idx];
         ide_read(part->my_disk, block_lba, buf, 1);
         dir_e = (struct dir_entry*)buf;
@@ -258,12 +279,14 @@ int create_dir_entry(struct partition* part, struct dir* pdir, uint32_t inode_no
                 if (new_size > pdir->inode->i_size) {
                     pdir->inode->i_size = new_size;
                 }
+                free_kernel_page((uint32_t)buf);
                 return 1;
             }
             dir_e++;
         }
         block_idx++;
     }
+    free_kernel_page((uint32_t)buf);
     return 0;
 }
 
@@ -271,6 +294,9 @@ int sync_dir_entry(struct dir* pdir, struct dir_entry* p_de, struct dir_entry* n
     uint32_t block_idx = 0;
     uint32_t block_cnt = 140;
     uint32_t* all_blocks = (uint32_t*)get_kernel_pages(1);
+    if (all_blocks == 0) {
+        return 0;
+    }
     memset(all_blocks, 0, PAGE_SIZE);
     for (block_idx = 0; block_idx < 12; block_idx++) {
         all_blocks[block_idx] = pdir->inode->i_sectors[block_idx];
@@ -279,6 +305,10 @@ int sync_dir_entry(struct dir* pdir, struct dir_entry* p_de, struct dir_entry* n
         ide_read(cur_part->my_disk, pdir->inode->i_sectors[12], all_blocks + 12, 1);
     }
     uint8_t* buf = (uint8_t*)get_kernel_pages(1);
+    if (buf == 0) {
+        free_kernel_page((uint32_t)all_blocks);
+        return 0;
+    }
     memset(buf, 0, PAGE_SIZE);
     uint32_t dir_entry_size = cur_part->sb->dir_entry_size;
     uint32_t dir_entry_cnt = BLOCK_SIZE / dir_entry_size;
@@ -293,11 +323,15 @@ int sync_dir_entry(struct dir* pdir, struct dir_entry* p_de, struct dir_entry* n
             if (p->i_no == p_de->i_no) {
                 memcpy(p, new_de, dir_entry_size);
                 ide_write(cur_part->my_disk, all_blocks[block_idx], buf, 1);
+                free_kernel_page((uint32_t)all_blocks);
+                free_kernel_page((uint32_t)buf);
                 return 1;
             }
             p++;
         }
     }
+    free_kernel_page((uint32_t)all_blocks);
+    free_kernel_page((uint32_t)buf);
     return 0;
 }
 
@@ -305,6 +339,9 @@ int delete_dir_entry(struct partition* part, struct dir* pdir, uint32_t inode_no
     uint32_t block_idx = 0;
     uint32_t block_cnt = 140;
     uint32_t* all_blocks = (uint32_t*)get_kernel_pages(1);
+    if (all_blocks == 0) {
+        return 0;
+    }
     memset(all_blocks, 0, PAGE_SIZE);
     for (block_idx = 0; block_idx < 12; block_idx++) {
         all_blocks[block_idx] = pdir->inode->i_sectors[block_idx];
@@ -313,6 +350,10 @@ int delete_dir_entry(struct partition* part, struct dir* pdir, uint32_t inode_no
         ide_read(part->my_disk, pdir->inode->i_sectors[12], all_blocks + 12, 1);
     }
     uint8_t* buf = (uint8_t*)get_kernel_pages(1);
+    if (buf == 0) {
+        free_kernel_page((uint32_t)all_blocks);
+        return 0;
+    }
     memset(buf, 0, PAGE_SIZE);
     uint32_t dir_entry_size = part->sb->dir_entry_size;
     uint32_t dir_entry_cnt = BLOCK_SIZE / dir_entry_size;
@@ -331,11 +372,15 @@ int delete_dir_entry(struct partition* part, struct dir* pdir, uint32_t inode_no
                 if (item_off + dir_entry_size >= pdir->inode->i_size) {
                     pdir->inode->i_size = item_off;
                 }
+                free_kernel_page((uint32_t)all_blocks);
+                free_kernel_page((uint32_t)buf);
                 return 1;
             }
             p_de++;
         }
     }
+    free_kernel_page((uint32_t)all_blocks);
+    free_kernel_page((uint32_t)buf);
     return 0;
 }
 
@@ -349,6 +394,9 @@ int search_file(const char* pathname, struct path_search_record* searched_record
     uint32_t path_len = strlen(pathname);
     ASSERT(pathname[0] == '/' && path_len > 1);
     char* sub_path = (char*)get_kernel_pages(1);
+    if (sub_path == 0) {
+        return -1;
+    }
     memset(sub_path, 0, PAGE_SIZE);
     strcpy(sub_path, pathname);
     char* path_ptr = sub_path;
@@ -372,20 +420,24 @@ int search_file(const char* pathname, struct path_search_record* searched_record
         if (sub_inode_no == -1) {
             searched_record->parent_dir = parent_dir;
             searched_record->file_type = FT_UNKNOWN;
+            free_kernel_page((uint32_t)sub_path);
             return -1;
         }
         if (path_ptr == NULL) {
             searched_record->parent_dir = parent_dir;
             searched_record->file_type = dir_e.f_type;
+            free_kernel_page((uint32_t)sub_path);
             return sub_inode_no;
         }
         if (dir_e.f_type != FT_DIRECTORY) {
+            free_kernel_page((uint32_t)sub_path);
             return -1;
         }
         parent_dir = dir_open(cur_part, (uint32_t)sub_inode_no);
     }
     searched_record->parent_dir = parent_dir;
     searched_record->file_type = FT_UNKNOWN;
+    free_kernel_page((uint32_t)sub_path);
     return -1;
 }
 
@@ -406,29 +458,51 @@ int create_file(const char* pathname) {
     memset(&searched_record, 0, sizeof(struct path_search_record));
     int inode_no = search_file(pathname, &searched_record);
     if (inode_no != -1) {
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     int32_t fd_idx = inode_bitmap_alloc(cur_part);
     if (fd_idx == -1) {
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     struct inode* new_inode = (struct inode*)get_kernel_pages(1);
+    if (new_inode == 0) {
+        inode_bitmap_free(cur_part, (uint32_t)fd_idx);
+        dir_close(searched_record.parent_dir);
+        return -1;
+    }
     memset(new_inode, 0, PAGE_SIZE);
     init_inode(new_inode, (uint32_t)fd_idx);
     struct dir* parent_dir = searched_record.parent_dir;
     uint8_t* buf = (uint8_t*)get_kernel_pages(1);
+    if (buf == 0) {
+        free_kernel_page((uint32_t)new_inode);
+        inode_bitmap_free(cur_part, (uint32_t)fd_idx);
+        dir_close(searched_record.parent_dir);
+        return -1;
+    }
     memset(buf, 0, PAGE_SIZE);
     inode_sync(cur_part, new_inode, buf);
     char* filename = strrchr(searched_record.searched_path, '/');
     if (filename == NULL) {
+        free_kernel_page((uint32_t)new_inode);
+        free_kernel_page((uint32_t)buf);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     filename++;
     if (!create_dir_entry(cur_part, parent_dir, (uint32_t)fd_idx, filename, FT_REGULAR)) {
+        free_kernel_page((uint32_t)new_inode);
+        free_kernel_page((uint32_t)buf);
         inode_bitmap_free(cur_part, (uint32_t)fd_idx);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     inode_sync(cur_part, parent_dir->inode, buf);
+    free_kernel_page((uint32_t)new_inode);
+    free_kernel_page((uint32_t)buf);
+    dir_close(searched_record.parent_dir);
     return 0;
 }
 
@@ -444,18 +518,23 @@ int open_file(const char* pathname, uint8_t flags) {
     if (inode_no == -1) {
         if (flags & O_CREAT) {
             if (!create_file(pathname)) {
+                dir_close(searched_record.parent_dir);
                 inode_no = search_file(pathname, &searched_record);
                 if (inode_no == -1) {
+                    dir_close(searched_record.parent_dir);
                     return -1;
                 }
             } else {
+                dir_close(searched_record.parent_dir);
                 return -1;
             }
         } else {
+            dir_close(searched_record.parent_dir);
             return -1;
         }
     }
     if (searched_record.file_type != FT_REGULAR) {
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     uint32_t global_fd_idx = 0;
@@ -466,6 +545,7 @@ int open_file(const char* pathname, uint8_t flags) {
         global_fd_idx++;
     }
     if (global_fd_idx >= MAX_FILE_OPEN) {
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     file_table[global_fd_idx].fd_pos = 0;
@@ -474,8 +554,10 @@ int open_file(const char* pathname, uint8_t flags) {
     fd_idx = (uint8_t)fd_install((int32_t)global_fd_idx);
     if (fd_idx == (uint8_t)-1) {
         file_table[global_fd_idx].fd_inode = NULL;
+        dir_close(searched_record.parent_dir);
         return -1;
     }
+    dir_close(searched_record.parent_dir);
     return fd_idx;
 }
 
@@ -563,23 +645,37 @@ int sys_unlink(const char* pathname) {
     memset(&searched_record, 0, sizeof(struct path_search_record));
     int inode_no = search_file(pathname, &searched_record);
     if (inode_no == -1) {
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     if (searched_record.file_type != FT_REGULAR) {
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     struct inode* inode = inode_open(cur_part, (uint32_t)inode_no);
     if (inode->i_open_cnt > 1) {
+        inode_close(inode);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     uint8_t* io_buf = (uint8_t*)get_kernel_pages(1);
+    if (io_buf == 0) {
+        inode_close(inode);
+        dir_close(searched_record.parent_dir);
+        return -1;
+    }
     memset(io_buf, 0, PAGE_SIZE);
     if (!delete_dir_entry(cur_part, searched_record.parent_dir, (uint32_t)inode_no, io_buf)) {
+        free_kernel_page((uint32_t)io_buf);
+        inode_close(inode);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     inode_sync(cur_part, searched_record.parent_dir->inode, io_buf);
+    free_kernel_page((uint32_t)io_buf);
     inode_release(cur_part, inode);
     inode_close(inode);
+    dir_close(searched_record.parent_dir);
     return 0;
 }
 
@@ -598,18 +694,25 @@ static uint32_t path_depth_cnt(char* pathname) {
 
 int32_t sys_mkdir(const char* pathname) {
     uint8_t* io_buf = (uint8_t*)get_kernel_pages(1);
+    if (io_buf == 0) {
+        return -1;
+    }
     memset(io_buf, 0, PAGE_SIZE);
     struct path_search_record searched_record;
     memset(&searched_record, 0, sizeof(struct path_search_record));
     int inode_no = search_file(pathname, &searched_record);
     if (inode_no != -1) {
         kprintf("sys_mkdir: %s exist!\n", pathname);
+        free_kernel_page((uint32_t)io_buf);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     uint32_t pathname_depth = path_depth_cnt((char*)pathname);
     uint32_t path_searched_depth = path_depth_cnt(searched_record.searched_path);
     if (pathname_depth != path_searched_depth) {
         kprintf("sys_mkdir: subpath %s not exist\n", searched_record.searched_path);
+        free_kernel_page((uint32_t)io_buf);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     struct dir* parent_dir = searched_record.parent_dir;
@@ -617,6 +720,8 @@ int32_t sys_mkdir(const char* pathname) {
 
     inode_no = inode_bitmap_alloc(cur_part);
     if (inode_no == -1) {
+        free_kernel_page((uint32_t)io_buf);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     struct inode new_dir_inode;
@@ -625,6 +730,8 @@ int32_t sys_mkdir(const char* pathname) {
     int32_t block_lba = block_bitmap_alloc(cur_part);
     if (block_lba == -1) {
         inode_bitmap_free(cur_part, (uint32_t)inode_no);
+        free_kernel_page((uint32_t)io_buf);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     new_dir_inode.i_sectors[0] = (uint32_t)block_lba;
@@ -644,10 +751,14 @@ int32_t sys_mkdir(const char* pathname) {
     if (!create_dir_entry(cur_part, parent_dir, (uint32_t)inode_no, dirname, FT_DIRECTORY)) {
         inode_bitmap_free(cur_part, (uint32_t)inode_no);
         block_bitmap_free(cur_part, (uint32_t)block_lba);
+        free_kernel_page((uint32_t)io_buf);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     inode_sync(cur_part, parent_dir->inode, io_buf);
     inode_sync(cur_part, &new_dir_inode, io_buf);
+    free_kernel_page((uint32_t)io_buf);
+    dir_close(searched_record.parent_dir);
     return 0;
 }
 
@@ -666,6 +777,7 @@ struct dir* sys_opendir(const char* name) {
     } else {
         ret = dir_open(cur_part, (uint32_t)inode_no);
     }
+    dir_close(searched_record.parent_dir);
     return ret;
 }
 
@@ -692,21 +804,25 @@ int32_t sys_rmdir(const char* pathname) {
     int inode_no = search_file(pathname, &searched_record);
     if (inode_no == -1) {
         kprintf("sys_rmdir: %s not exist\n", pathname);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     ASSERT(inode_no != 0);
     if (searched_record.file_type == FT_REGULAR) {
         kprintf("sys_rmdir: %s is regular file!\n", pathname);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     struct dir* dir = dir_open(cur_part, (uint32_t)inode_no);
     if (!dir_is_empty(dir)) {
         kprintf("sys_rmdir: %s is not empty\n", pathname);
         dir_close(dir);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     int32_t ret = dir_remove(searched_record.parent_dir, dir);
     dir_close(dir);
+    dir_close(searched_record.parent_dir);
     return ret;
 }
 
@@ -753,11 +869,15 @@ static int get_child_dir_name(uint32_t p_inode_nr, uint32_t c_inode_nr, char* pa
 
 char* sys_getcwd(char* buf, uint32_t size) {
     uint8_t* io_buf = (uint8_t*)get_kernel_pages(1);
+    if (io_buf == 0) {
+        return NULL;
+    }
     memset(io_buf, 0, PAGE_SIZE);
     uint32_t child_inode_nr = current_task->cwd_inode_nr;
     if (child_inode_nr == 0) {
         buf[0] = '/';
         buf[1] = 0;
+        free_kernel_page((uint32_t)io_buf);
         return buf;
     }
     memset(buf, 0, size);
@@ -765,6 +885,7 @@ char* sys_getcwd(char* buf, uint32_t size) {
     while (child_inode_nr) {
         uint32_t parent_inode_nr = get_parent_dir_inode_nr(child_inode_nr, io_buf);
         if (get_child_dir_name(parent_inode_nr, child_inode_nr, full_path_reverse, io_buf) == -1) {
+            free_kernel_page((uint32_t)io_buf);
             return NULL;
         }
         child_inode_nr = parent_inode_nr;
@@ -775,6 +896,7 @@ char* sys_getcwd(char* buf, uint32_t size) {
         strcpy(buf + len, last_slash);
         *last_slash = 0;
     }
+    free_kernel_page((uint32_t)io_buf);
     return buf;
 }
 
@@ -783,13 +905,16 @@ int32_t sys_chdir(const char* path) {
     memset(&searched_record, 0, sizeof(struct path_search_record));
     int inode_no = search_file(path, &searched_record);
     if (inode_no == -1) {
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     if (searched_record.file_type != FT_DIRECTORY) {
         kprintf("sys_chdir: %s is not directory\n", path);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     current_task->cwd_inode_nr = (uint32_t)inode_no;
+    dir_close(searched_record.parent_dir);
     return 0;
 }
 
@@ -805,6 +930,7 @@ int32_t sys_stat(const char* path, struct stat* buf) {
     int inode_no = search_file(path, &searched_record);
     if (inode_no == -1) {
         kprintf("sys_stat: %s not found\n", path);
+        dir_close(searched_record.parent_dir);
         return -1;
     }
     struct inode* obj_inode = inode_open(cur_part, (uint32_t)inode_no);
@@ -812,5 +938,6 @@ int32_t sys_stat(const char* path, struct stat* buf) {
     inode_close(obj_inode);
     buf->st_filetype = searched_record.file_type;
     buf->st_ino = (uint32_t)inode_no;
+    dir_close(searched_record.parent_dir);
     return 0;
 }

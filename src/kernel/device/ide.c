@@ -1,5 +1,6 @@
 // 参考: 《操作系统真相还原》(于渊) 第13章 硬盘驱动
 #include "ide.h"
+#include <stddef.h>
 #include "../initer/io/io.h"
 #include "../include/asmFunc.h"
 #include "../include/assert.h"
@@ -32,15 +33,16 @@
 #define CMD_READ_SECTOR 0x20  
 #define CMD_WRITE_SECTOR 0x30 
 
-#define MAX_LBA ((80 * 1024 * 1024 / 512) - 1)
+#define MAX_LBA_DEFAULT ((80 * 1024 * 1024 / 512) - 1) 
+#define MAX_LBA28 (0x0FFFFFFF) 
 
 #define DIV_ROUND_UP(X, STEP) ((X + STEP - 1) / STEP)
 
 uint8_t channel_cnt;
 struct ide_channel channels[2];
 
-int32_t ext_lba_base = 0;   
-uint8_t p_no = 0, l_no = 0; 
+uint32_t ext_lba_base = 0;
+uint8_t p_no = 0, l_no = 0;
 struct list partition_list; 
 
 struct partition_table_entry {
@@ -59,8 +61,15 @@ struct partition_table_entry {
 struct boot_sector {
     uint8_t other[446];
     struct partition_table_entry partition_table[4];
-    uint16_t signature; 
+    uint16_t signature;
 } __attribute__((packed));
+
+_Static_assert(sizeof(struct partition_table_entry) == 16,
+    "partition_table_entry must be exactly 16 bytes (MBR spec)");
+_Static_assert(sizeof(struct boot_sector) == 512,
+    "boot_sector must be exactly 512 bytes (one sector)");
+_Static_assert(offsetof(struct boot_sector, partition_table) == 446,
+    "partition_table must start at offset 446 in boot_sector");
 
 static void ide_panic(const char* msg) {
     setTextColor(12);
@@ -80,7 +89,7 @@ static void select_disk(struct disk* hd) {
 }
 
 static void select_sector(struct disk* hd, uint32_t lba, uint8_t sec_cnt) {
-    ASSERT(lba <= MAX_LBA);
+    ASSERT(lba <= hd->max_lba);
     struct ide_channel* channel = hd->my_channel;
     outb(reg_sect_cnt(channel), sec_cnt);
     outb(reg_lba_l(channel), lba);
@@ -134,7 +143,7 @@ static int busy_wait(struct disk* hd) {
 }
 
 void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {
-    ASSERT(lba <= MAX_LBA);
+    ASSERT(lba <= hd->max_lba);
     ASSERT(sec_cnt > 0);
     lock_acquire(&hd->my_channel->lock);
 
@@ -158,7 +167,7 @@ void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {
 }
 
 void ide_write(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {
-    ASSERT(lba <= MAX_LBA);
+    ASSERT(lba <= hd->max_lba);
     ASSERT(sec_cnt > 0);
     lock_acquire(&hd->my_channel->lock);
 
@@ -225,24 +234,31 @@ static void identify_disk(struct disk* hd) {
     uint32_t sector = *(uint32_t*)&id_info[60 * 2]; 
     kprintf("    SECTORS: %d\n", (int)sector);
     kprintf("    CAPACITY: %dMB\n", (int)(sector * 512 / 1024 / 1024));
+    hd->max_lba = (sector > 1) ? sector - 1 : MAX_LBA_DEFAULT;
+    if (hd->max_lba > MAX_LBA28) {
+        hd->max_lba = MAX_LBA28;
+    }
 }
 
 static void partition_scan(struct disk* hd, uint32_t ext_lba) {
     struct boot_sector* bs = (struct boot_sector*)get_kernel_pages(1);
+    if (bs == NULL) {
+        return;
+    }
     ide_read(hd, ext_lba, bs, 1);
     uint8_t part_idx = 0;
     struct partition_table_entry* p = bs->partition_table;
 
     while (part_idx++ < 4) {
-        if (p->fs_type == 0x5) { 
+        if (p->fs_type == 0x5) {
             if (ext_lba == 0) {
                 ext_lba_base = p->start_lba;
                 partition_scan(hd, p->start_lba);
             } else {
                 partition_scan(hd, p->start_lba + ext_lba_base);
             }
-        } else if (p->fs_type != 0) { 
-            if (ext_lba == 0) {       
+        } else if (p->fs_type != 0) {
+            if (ext_lba == 0) {
                 hd->prim_parts[p_no].start_lba = ext_lba + p->start_lba;
                 hd->prim_parts[p_no].sec_cnt = p->sec_cnt;
                 hd->prim_parts[p_no].my_disk = hd;
@@ -250,7 +266,7 @@ static void partition_scan(struct disk* hd, uint32_t ext_lba) {
                 sprintf(hd->prim_parts[p_no].name, "%s%d", hd->name, p_no + 1);
                 p_no++;
                 ASSERT(p_no < 4);
-            } else { 
+            } else {
                 hd->logic_parts[l_no].start_lba = ext_lba + p->start_lba;
                 hd->logic_parts[l_no].sec_cnt = p->sec_cnt;
                 hd->logic_parts[l_no].my_disk = hd;
@@ -258,12 +274,14 @@ static void partition_scan(struct disk* hd, uint32_t ext_lba) {
                 sprintf(hd->logic_parts[l_no].name, "%s%d", hd->name, l_no + 5);
                 l_no++;
                 if (l_no >= 8) {
+                    free_kernel_page((uint32_t)bs);
                     return;
                 }
             }
         }
         p++;
     }
+    free_kernel_page((uint32_t)bs);
 }
 
 static void print_partition_info(void) {

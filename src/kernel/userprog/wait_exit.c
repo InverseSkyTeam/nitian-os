@@ -3,27 +3,54 @@
 #include "../thread/thread.h"
 #include "../lib/list/list.h"
 #include "../memory/pool/pool.h"
+#include "../memory/bitmap/bitmap.h"
+#include "./process.h"
 #include "../fs/file.h"
 #include "../include/assert.h"
+
+static int vaddr_owned_by_current(struct task_struct* t, uint32_t vaddr) {
+    if (vaddr < USER_VADDR_START || vaddr >= 0xc0000000) {
+        return 0;
+    }
+    uint32_t bit_idx = (vaddr - USER_VADDR_START) / PAGE_SIZE;
+    if (bit_idx >= t->userprog_v_addr.vaddr_bitmap.btmp_bytes_len * 8) {
+        return 0;
+    }
+    return bitmap_scan_test(&t->userprog_v_addr.vaddr_bitmap, bit_idx) == 1;
+}
 
 static void release_prog_resource(struct task_struct* release_thread) {
     if (release_thread->pgdir != 0) {
         uint32_t* pgdir_vaddr = (uint32_t*)release_thread->pgdir;
         for (uint32_t pde_idx = 0; pde_idx < 768; pde_idx++) {
             uint32_t pde = pgdir_vaddr[pde_idx];
-            if (!(pde & 1)) continue;                        
-            if (pde & 0x80) continue;                                        
+            if (!(pde & 1)) continue;
+            if (pde & 0x80) continue;
 
             uint32_t* first_pte = pte_ptr(pde_idx * 0x400000);
+            uint32_t remaining = 0;
             for (uint32_t pte_idx = 0; pte_idx < 1024; pte_idx++) {
-                if (first_pte[pte_idx] & 1) {
-                    pfree(&kernel_pool, first_pte[pte_idx] & 0xfffff000);
-                    first_pte[pte_idx] = 0;
+                if (!(first_pte[pte_idx] & 1)) continue;
+                uint32_t vaddr = pde_idx * 0x400000 + pte_idx * PAGE_SIZE;
+                if (!vaddr_owned_by_current(release_thread, vaddr)) {
+                    remaining++;
+                    continue;
                 }
+                pfree(&kernel_pool, first_pte[pte_idx] & 0xfffff000);
+                first_pte[pte_idx] = 0;
             }
-
-            pfree(&kernel_pool, pde & 0xfffff000);
-            pgdir_vaddr[pde_idx] = 0;
+            if (remaining == 0) {
+                pfree(&kernel_pool, pde & 0xfffff000);
+                pgdir_vaddr[pde_idx] = 0;
+            }
+        }
+        if (release_thread->userprog_v_addr.vaddr_bitmap.bits != NULL) {
+            uint32_t bitmap_bytes = release_thread->userprog_v_addr.vaddr_bitmap.btmp_bytes_len;
+            uint32_t bitmap_pg_cnt = (bitmap_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
+            for (uint32_t i = 0; i < bitmap_pg_cnt; i++) {
+                free_kernel_page((uint32_t)release_thread->userprog_v_addr.vaddr_bitmap.bits + i * PAGE_SIZE);
+            }
+            release_thread->userprog_v_addr.vaddr_bitmap.bits = NULL;
         }
     }
     for (uint32_t fd_idx = 3; fd_idx < MAX_FILES_OPEN_PER_PROC; fd_idx++) {

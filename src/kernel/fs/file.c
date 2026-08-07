@@ -44,8 +44,15 @@ uint32_t file_read(struct file* file, void* buf, uint32_t count) {
         read_size = count;
     }
     uint8_t* block_buf = (uint8_t*)get_kernel_pages(1);
+    if (block_buf == 0) {
+        return 0;
+    }
     memset(block_buf, 0, PAGE_SIZE);
     uint32_t* all_blocks = (uint32_t*)get_kernel_pages(1);
+    if (all_blocks == 0) {
+        free_kernel_page((uint32_t)block_buf);
+        return 0;
+    }
     memset(all_blocks, 0, PAGE_SIZE);
     uint32_t block_idx = 0;
     for (block_idx = 0; block_idx < 12; block_idx++) {
@@ -74,6 +81,8 @@ uint32_t file_read(struct file* file, void* buf, uint32_t count) {
         off = 0;
     }
     file->fd_pos += bytes_read;
+    free_kernel_page((uint32_t)block_buf);
+    free_kernel_page((uint32_t)all_blocks);
     return bytes_read;
 }
 
@@ -83,8 +92,15 @@ uint32_t file_write(struct file* file, const void* buf, uint32_t count) {
     }
     uint32_t bytes_written = 0;
     uint8_t* block_buf = (uint8_t*)get_kernel_pages(1);
+    if (block_buf == 0) {
+        return (uint32_t)-1;
+    }
     memset(block_buf, 0, PAGE_SIZE);
     uint32_t* all_blocks = (uint32_t*)get_kernel_pages(1);
+    if (all_blocks == 0) {
+        free_kernel_page((uint32_t)block_buf);
+        return (uint32_t)-1;
+    }
     memset(all_blocks, 0, PAGE_SIZE);
     uint32_t block_idx = 0;
     for (block_idx = 0; block_idx < 12; block_idx++) {
@@ -97,7 +113,7 @@ uint32_t file_write(struct file* file, const void* buf, uint32_t count) {
         block_idx = file->fd_pos / BLOCK_SIZE;
         uint32_t off = file->fd_pos % BLOCK_SIZE;
         if (block_idx >= 140) {
-            return (uint32_t)-1;
+            break;
         }
         if (all_blocks[block_idx] == 0) {
             if (block_idx < 12) {
@@ -119,7 +135,10 @@ uint32_t file_write(struct file* file, const void* buf, uint32_t count) {
                 all_blocks[block_idx] = block_lba;
             }
             uint8_t* io_buf = (uint8_t*)get_kernel_pages(1);
-            inode_sync(cur_part, file->fd_inode, io_buf);
+            if (io_buf != 0) {
+                inode_sync(cur_part, file->fd_inode, io_buf);
+                free_kernel_page((uint32_t)io_buf);
+            }
             memset(block_buf, 0, BLOCK_SIZE);
         }
         uint32_t block_lba = all_blocks[block_idx];
@@ -139,6 +158,11 @@ uint32_t file_write(struct file* file, const void* buf, uint32_t count) {
         }
     }
     uint8_t* io_buf = (uint8_t*)get_kernel_pages(1);
-    inode_sync(cur_part, file->fd_inode, io_buf);
+    if (io_buf != 0) {
+        inode_sync(cur_part, file->fd_inode, io_buf);
+        free_kernel_page((uint32_t)io_buf);
+    }
+    free_kernel_page((uint32_t)block_buf);
+    free_kernel_page((uint32_t)all_blocks);
     return bytes_written;
 }

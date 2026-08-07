@@ -24,15 +24,19 @@ struct dir* dir_open(struct partition* part, uint32_t inode_no) {
 }
 
 void dir_close(struct dir* dir) {
-    if (dir == &root_dir) {
+    if (dir == NULL || dir == &root_dir) {
         return;
     }
     inode_close(dir->inode);
+    free_kernel_page((uint32_t)dir);
 }
 
 int dir_lookup(struct dir* pdir, const char* name, struct dir_entry* dir_e) {
     uint32_t block_cnt = 140;
     uint32_t* all_blocks = (uint32_t*)get_kernel_pages(1);
+    if (all_blocks == NULL) {
+        return -1;
+    }
     memset(all_blocks, 0, PAGE_SIZE);
     uint32_t block_idx = 0;
     for (block_idx = 0; block_idx < 12; block_idx++) {
@@ -42,6 +46,10 @@ int dir_lookup(struct dir* pdir, const char* name, struct dir_entry* dir_e) {
         ide_read(cur_part->my_disk, pdir->inode->i_sectors[12], all_blocks + 12, 1);
     }
     uint8_t* buf = (uint8_t*)get_kernel_pages(1);
+    if (buf == NULL) {
+        free_kernel_page((uint32_t)all_blocks);
+        return -1;
+    }
     memset(buf, 0, PAGE_SIZE);
     uint32_t dir_entry_size = cur_part->sb->dir_entry_size;
     uint32_t dir_entry_cnt = BLOCK_SIZE / dir_entry_size;
@@ -55,11 +63,15 @@ int dir_lookup(struct dir* pdir, const char* name, struct dir_entry* dir_e) {
         for (i = 0; i < dir_entry_cnt; i++) {
             if (strcmp(p_de->filename, name) == 0) {
                 memcpy(dir_e, p_de, dir_entry_size);
+                free_kernel_page((uint32_t)buf);
+                free_kernel_page((uint32_t)all_blocks);
                 return 1;
             }
             p_de++;
         }
     }
+    free_kernel_page((uint32_t)buf);
+    free_kernel_page((uint32_t)all_blocks);
     return -1;
 }
 
@@ -113,9 +125,13 @@ int32_t dir_remove(struct dir* parent_dir, struct dir* child_dir) {
         block_idx++;
     }
     uint8_t* io_buf = (uint8_t*)get_kernel_pages(1);
+    if (io_buf == NULL) {
+        return -1;
+    }
     memset(io_buf, 0, PAGE_SIZE);
     delete_dir_entry(cur_part, parent_dir, child_dir_inode->i_no, io_buf);
     inode_sync(cur_part, parent_dir->inode, io_buf);
     inode_release(cur_part, child_dir_inode);
+    free_kernel_page((uint32_t)io_buf);
     return 0;
 }

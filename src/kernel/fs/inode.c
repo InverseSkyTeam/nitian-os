@@ -32,6 +32,9 @@ struct inode* inode_open(struct partition* part, uint32_t inode_no) {
     struct inode_position inode_pos;
     inode_locate(part, inode_no, &inode_pos);
     uint8_t* buf = (uint8_t*)get_kernel_pages(1);
+    if (buf == NULL) {
+        return NULL;
+    }
     memset(buf, 0, PAGE_SIZE);
     if (inode_pos.two_sec) {
         ide_read(part->my_disk, inode_pos.sec_lba, buf, 2);
@@ -39,12 +42,17 @@ struct inode* inode_open(struct partition* part, uint32_t inode_no) {
         ide_read(part->my_disk, inode_pos.sec_lba, buf, 1);
     }
     struct inode* inode = (struct inode*)get_kernel_pages(1);
+    if (inode == NULL) {
+        free_kernel_page((uint32_t)buf);
+        return NULL;
+    }
     memset(inode, 0, PAGE_SIZE);
     memcpy(inode, buf + inode_pos.off_size, sizeof(struct inode));
     inode->i_no = inode_no;
     inode->i_open_cnt = 1;
     inode->write_deny = 0;
     list_append(&part->open_inodes, &inode->inode_tag);
+    free_kernel_page((uint32_t)buf);
     return inode;
 }
 
@@ -54,6 +62,7 @@ void inode_close(struct inode* inode) {
     if (--inode->i_open_cnt == 0) {
         list_remove(&inode->inode_tag);
         inode->i_open_cnt = 0;
+        free_kernel_page((uint32_t)inode);
     }
     asm_restore_eflags(old);
 }
@@ -82,6 +91,9 @@ void inode_release(struct partition* part, struct inode* inode) {
     uint32_t block_idx = 0;
     uint32_t block_cnt = 12;
     uint32_t* all_blocks = (uint32_t*)get_kernel_pages(1);
+    if (all_blocks == NULL) {
+        return;
+    }
     memset(all_blocks, 0, PAGE_SIZE);
     for (block_idx = 0; block_idx < 12; block_idx++) {
         all_blocks[block_idx] = inode->i_sectors[block_idx];
@@ -98,4 +110,5 @@ void inode_release(struct partition* part, struct inode* inode) {
         block_bitmap_free(part, inode->i_sectors[12]);
     }
     inode_bitmap_free(part, inode->i_no);
+    free_kernel_page((uint32_t)all_blocks);
 }

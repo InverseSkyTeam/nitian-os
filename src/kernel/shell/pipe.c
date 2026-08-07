@@ -34,6 +34,7 @@ int32_t sys_pipe(int32_t pipefd[2]) {
 
     ioq_init((struct ioqueue*)buf);
 
+    file_table[global_fd].fd_inode = (struct inode*)buf;
     file_table[global_fd].fd_flag = PIPE_FLAG;
     file_table[global_fd].fd_pos = 2;
 
@@ -42,6 +43,7 @@ int32_t sys_pipe(int32_t pipefd[2]) {
     if (pipefd[0] == -1 || pipefd[1] == -1) {
         if (pipefd[0] != -1) fd_release((uint32_t)pipefd[0]);
         if (pipefd[1] != -1) fd_release((uint32_t)pipefd[1]);
+        free_kernel_page((uint32_t)buf);
         file_table[global_fd].fd_inode = NULL;
         file_table[global_fd].fd_flag = 0;
         file_table[global_fd].fd_pos = 0;

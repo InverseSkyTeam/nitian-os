@@ -142,10 +142,18 @@ int32_t sys_execv(const char* path, const char* argv[]) {
 
     old_pgdir = cur->pgdir;
     if (cur->pgdir == 0) {
-        create_user_vaddr_bitmap(cur);
         cur->pgdir = (uint32_t)create_page_dir();
         process_activate(cur);
     }
+    if (cur->userprog_v_addr.vaddr_bitmap.bits != NULL) {
+        uint32_t bitmap_bytes = cur->userprog_v_addr.vaddr_bitmap.btmp_bytes_len;
+        uint32_t bitmap_pg_cnt = (bitmap_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
+        for (uint32_t i = 0; i < bitmap_pg_cnt; i++) {
+            free_kernel_page((uint32_t)cur->userprog_v_addr.vaddr_bitmap.bits + i * PAGE_SIZE);
+        }
+        cur->userprog_v_addr.vaddr_bitmap.bits = NULL;
+    }
+    create_user_vaddr_bitmap(cur);
 
     argc = 0;
     while (argv && argv[argc] && argc < MAX_ARG_NR) {

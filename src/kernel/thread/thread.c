@@ -219,7 +219,8 @@ struct fork_args {
 
 static void fork_thread_entry(void* arg_) {
     struct fork_args* fa = (struct fork_args*)arg_;
-    fa->cb(fa->user_arg, fa->child_pid, 1);  
+    fa->cb(fa->user_arg, fa->child_pid, 1);
+    free_kernel_page((uint32_t)fa);
 }
 
 static void build_fork_thread_stack(struct task_struct* t, struct fork_args* fa) {
@@ -367,7 +368,7 @@ void thread_exit(struct task_struct* thread_over, int need_schedule) {
         list_remove(&thread_over->general_tag);
     }
     if (thread_over->pgdir) {
-        pfree(&kernel_pool, thread_over->pgdir);
+        free_kernel_page(thread_over->pgdir);
         thread_over->pgdir = 0;
     }
     if (elem_find(&g_thread_all_list, &thread_over->all_list_tag)) {

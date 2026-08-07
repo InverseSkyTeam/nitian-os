@@ -164,11 +164,20 @@ void free_kernel_page(uint32_t vaddr) {
     uint32_t old_cr3;
     __asm__ volatile("mov %%cr3, %0" : "=r"(old_cr3));
     asm_write_cr3(0x400000);
+    uint32_t* pde = pde_ptr(vaddr);
+    if (!(*pde & 1) || (*pde & 0x80)) {
+        asm_write_cr3(old_cr3);
+        return;
+    }
     uint32_t* pte = pte_ptr(vaddr);
     if (*pte & 1) {
         uint32_t phy = *pte & 0xfffff000;
         *pte = 0;
         pfree(&kernel_pool, phy);
+        uint32_t bit_idx = (vaddr - kernel_vaddr.vaddr_start) / PAGE_SIZE;
+        if (bit_idx < kernel_vaddr.vaddr_bitmap.btmp_bytes_len * 8) {
+            bitmap_set(&kernel_vaddr.vaddr_bitmap, bit_idx, 0);
+        }
     }
     asm_write_cr3(old_cr3);
 }
